@@ -27,6 +27,15 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 struct Feed {
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    updated: Option<String>,
+    #[serde(default)]
+    link: Option<Vec<serde_json::Value>>,
+    #[serde(default)]
     entry: Option<Vec<Entry>>,
 }
 
@@ -36,12 +45,16 @@ struct Entry {
     title: String,
     summary: Option<String>,
     published: String,
+    #[serde(default)]
+    updated: Option<String>,
     #[serde(rename = "author", default)]
     authors: Vec<Author>,
     #[serde(rename = "arxiv:primary_category", default)]
     primary_category: Option<PrimaryCategory>,
     #[serde(rename = "category", default)]
     categories: Vec<Category>,
+    #[serde(default)]
+    link: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

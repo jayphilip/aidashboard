@@ -13,7 +13,9 @@
       "Bash(cargo run:*)",
       "Bash(docker ps:*)",
       "Bash(docker logs:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nPhase 4: Dashboard UX - Build three-lane today view, topic trends, and sources admin\n\nImplements the complete Phase 4 dashboard experience:\n\nWeb \\(Frontend\\):\n- Added Drizzle schema for sources, items, item_topics, item_likes tables\n- Created PGlite table definitions to sync from Electric\n- Implemented data stores for items, sources, and topics with error handling\n- Built scoring algorithm for ranking content \\(recency + engagement + user preference\\)\n- Created ''Today'' page with three lanes \\(Papers, Newsletters/Blogs, Social\\)\n- Built ''Topic Trends'' page with weekly aggregation and sparklines\n- Built ''Sources'' admin page for managing ingestion sources\n- Added Navigation component with route links\n- Added ItemCard component for displaying content\n- Created utility functions for formatting and excerpts\n\nBackend \\(Ingestor\\):\n- Fixed arXiv XML parsing by adding missing fields to Feed/Entry structs\n- Added proper #[serde\\(default\\)] attributes for robust deserialization\n\nAll pages handle empty data gracefully and integrate with Electric sync.\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
