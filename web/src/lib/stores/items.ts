@@ -1,9 +1,11 @@
 // web/src/lib/stores/items.ts
 import { writable, type Readable } from 'svelte/store';
 import type { InferSelectModel } from 'drizzle-orm';
-import { desc, eq, and, gte, sql } from 'drizzle-orm';
+import { desc, eq, gte, sql } from 'drizzle-orm';
 import { getPGlite, getDb } from '$lib/db';
 import { items, itemTopics, itemLikes, sources } from '$lib/schema';
+
+const ELECTRIC_URL = import.meta.env.PUBLIC_ELECTRIC_URL || 'http://localhost:3000';
 
 export type Item = InferSelectModel<typeof items>;
 export type Source = InferSelectModel<typeof sources>;
@@ -104,13 +106,12 @@ export async function initializeItemsSync() {
 
   try {
     const pg = await getPGlite();
-    const db = await getDb();
 
     // Start syncing `items`, `sources`, `item_topics`, `item_likes` shapes into local tables
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: 'http://localhost:3000/v1/shape',
+          url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'items',
             subset__order_by: 'published_at DESC',
@@ -130,7 +131,7 @@ export async function initializeItemsSync() {
       }),
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: 'http://localhost:3000/v1/shape',
+          url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'sources',
           },
@@ -141,7 +142,7 @@ export async function initializeItemsSync() {
       }),
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: 'http://localhost:3000/v1/shape',
+          url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'item_topics',
           },
@@ -152,7 +153,7 @@ export async function initializeItemsSync() {
       }),
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: 'http://localhost:3000/v1/shape',
+          url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'item_likes',
           },

@@ -34,8 +34,6 @@ struct Feed {
     #[serde(default)]
     updated: Option<String>,
     #[serde(default)]
-    link: Option<Vec<serde_json::Value>>,
-    #[serde(default)]
     entry: Option<Vec<Entry>>,
 }
 
@@ -53,8 +51,6 @@ struct Entry {
     primary_category: Option<PrimaryCategory>,
     #[serde(rename = "category", default)]
     categories: Vec<Category>,
-    #[serde(default)]
-    link: Option<Vec<serde_json::Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

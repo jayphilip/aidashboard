@@ -5,6 +5,8 @@ import { desc } from 'drizzle-orm';
 import { getPGlite, getDb } from '$lib/db';
 import { papers } from '$lib/schema';
 
+const ELECTRIC_URL = import.meta.env.PUBLIC_ELECTRIC_URL || 'http://localhost:3000';
+
 export type Paper = InferSelectModel<typeof papers>;
 
 type PapersState = {
@@ -46,7 +48,7 @@ export async function initializePapersSync() {
     // Start syncing `papers` shape into local `papers` table
     const shape = await (pg as any).electric.syncShapeToTable({
       shape: {
-        url: 'http://localhost:3000/v1/shape',
+        url: `${ELECTRIC_URL}/v1/shape`,
         params: {
           table: 'papers',
           subset__order_by: 'created_at DESC',
