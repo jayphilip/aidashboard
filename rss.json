@@ -1,0 +1,202 @@
+[
+  {
+    "name": "One Useful Thing (Ethan Mollick)",
+    "type": "newsletter",
+    "category": "analysis_application",
+    "source": "independent",
+    "rss_url": "https://www.oneusefulthing.org/feed",
+    "site_url": "https://www.oneusefulthing.org/",
+    "signal_score": 0.98,
+    "notes": "Practical, evidence-based analysis of how AI reshapes work and education."
+  },
+  {
+    "name": "Simon Willison's Weblog",
+    "type": "blog",
+    "category": "engineering_applied",
+    "source": "independent",
+    "rss_url": "https://simonwillison.net/atom/entries/",
+    "site_url": "https://simonwillison.net/",
+    "signal_score": 0.98,
+    "notes": "Essential for AI engineers. Focuses on practical LLM usage, security, and hacking."
+  },
+  {
+    "name": "Ahead of AI (Sebastian Raschka)",
+    "type": "newsletter",
+    "category": "education_technical",
+    "source": "independent",
+    "rss_url": "https://magazine.sebastianraschka.com/feed",
+    "site_url": "https://magazine.sebastianraschka.com/",
+    "signal_score": 0.95,
+    "notes": "Bridges research papers and code. Excellent for understanding new architectures."
+  },
+  {
+    "name": "Interconnects (Nathan Lambert)",
+    "type": "newsletter",
+    "category": "analysis_technical",
+    "source": "independent",
+    "rss_url": "https://www.interconnects.ai/feed",
+    "site_url": "https://www.interconnects.ai/",
+    "signal_score": 0.92,
+    "notes": "Deep analysis of the open-source model ecosystem, RLHF, and technical policy."
+  },
+  {
+    "name": "Chip Huyen",
+    "type": "blog",
+    "category": "engineering_systems",
+    "source": "independent",
+    "rss_url": "https://huyenchip.com/feed.xml",
+    "site_url": "https://huyenchip.com/",
+    "signal_score": 0.95,
+    "notes": "Focuses on 'Real World AI'—data infra, MLOps, and production challenges."
+  },
+  {
+    "name": "Marcus on AI (Gary Marcus)",
+    "type": "newsletter",
+    "category": "analysis_critical",
+    "source": "independent",
+    "rss_url": "https://garymarcus.substack.com/feed",
+    "site_url": "https://garymarcus.substack.com/",
+    "signal_score": 0.9,
+    "notes": "Critical skepticism and realistic assessment of AI hype and limitations."
+  },
+  {
+    "name": "Benedict Evans",
+    "type": "newsletter",
+    "category": "analysis_strategy",
+    "source": "independent",
+    "rss_url": "https://www.ben-evans.com/benedictevans?format=rss",
+    "site_url": "https://www.ben-evans.com/",
+    "signal_score": 0.9,
+    "notes": "Strategic big-picture view. Treats AI as a platform shift."
+  },
+  {
+    "name": "TLDR AI",
+    "type": "newsletter",
+    "category": "news_technical",
+    "source": "independent",
+    "rss_url": "https://tldr.tech/ai/feed",
+    "site_url": "https://tldr.tech/ai",
+    "signal_score": 0.9,
+    "notes": "Summaries of AI/ML news, tools, and papers for practitioners."
+  },
+  {
+    "name": "OpenAI Blog",
+    "type": "blog",
+    "category": "research_industry",
+    "source": "company",
+    "rss_url": "https://openai.com/news/rss.xml",
+    "site_url": "https://openai.com/news",
+    "signal_score": 0.98,
+    "notes": "Primary source for GPT/DALL-E releases and safety research."
+  },
+  {
+    "name": "Google DeepMind Blog",
+    "type": "blog",
+    "category": "research_industry",
+    "source": "company",
+    "rss_url": "https://deepmind.google/blog/rss.xml",
+    "site_url": "https://deepmind.google/blog/",
+    "signal_score": 0.95,
+    "notes": "Research and product updates from Google DeepMind (Gemini, AlphaFold)."
+  },
+  {
+    "name": "Microsoft AI Blog",
+    "type": "blog",
+    "category": "research_industry",
+    "source": "company",
+    "rss_url": "https://blogs.microsoft.com/ai/feed/",
+    "site_url": "https://blogs.microsoft.com/ai/",
+    "signal_score": 0.9,
+    "notes": "Updates on Azure AI, Copilot, and foundational research from MS."
+  },
+  {
+    "name": "Hugging Face Blog",
+    "type": "blog",
+    "category": "technical_community",
+    "source": "company",
+    "rss_url": "https://huggingface.co/blog/feed.xml",
+    "site_url": "https://huggingface.co/blog",
+    "signal_score": 0.95,
+    "notes": "Deep dives into open-source models, datasets, and implementation guides."
+  },
+  {
+    "name": "NVIDIA AI Blog",
+    "type": "blog",
+    "category": "engineering_hardware",
+    "source": "company",
+    "rss_url": "https://nvidianews.nvidia.com/rss",
+    "site_url": "https://nvidianews.nvidia.com/section/artificial-intelligence",
+    "signal_score": 0.9,
+    "notes": "Focus on hardware acceleration, enterprise AI, and compute infrastructure."
+  },
+  {
+    "name": "Import AI",
+    "type": "newsletter",
+    "category": "policy_safety",
+    "source": "independent",
+    "rss_url": "https://importai.substack.com/feed",
+    "site_url": "https://importai.net/",
+    "signal_score": 0.9,
+    "notes": "Jack Clark's newsletter focusing on AI policy, safety, and capabilities."
+  },
+  {
+    "name": "ArXiv (cs.AI)",
+    "type": "repo",
+    "category": "research_raw",
+    "source": "university",
+    "rss_url": "http://export.arxiv.org/rss/cs.AI",
+    "site_url": "https://arxiv.org/list/cs.AI/recent",
+    "signal_score": 0.85,
+    "notes": "High volume raw feed of new pre-print papers in Artificial Intelligence."
+  },
+  {
+    "name": "Machine Learning Mastery",
+    "type": "blog",
+    "category": "applied_ml",
+    "source": "independent",
+    "rss_url": "https://machinelearningmastery.com/feed/",
+    "site_url": "https://machinelearningmastery.com",
+    "signal_score": 0.85,
+    "notes": "Tutorials and how-to guides for applied machine learning."
+  },
+  {
+    "name": "Uber Engineering",
+    "type": "blog",
+    "category": "engineering_infra",
+    "source": "company",
+    "rss_url": "https://eng.uber.com/feed/",
+    "site_url": "https://eng.uber.com",
+    "signal_score": 0.8,
+    "notes": "Engineering and applied ML posts from Uber (Michelangelo, Horovod)."
+  },
+  {
+    "name": "CFA Institute: Enterprising Investor (AI)",
+    "type": "blog",
+    "category": "finance_professional",
+    "source": "association",
+    "rss_url": "https://blogs.cfainstitute.org/investor/category/artificial-intelligence/feed/",
+    "site_url": "https://blogs.cfainstitute.org/investor/category/artificial-intelligence/",
+    "signal_score": 0.92,
+    "notes": "High-quality analysis on how AI impacts investment management and ethics."
+  },
+  {
+    "name": "Two Sigma Insights",
+    "type": "blog",
+    "category": "finance_quant",
+    "source": "company",
+    "rss_url": "https://www.twosigma.com/feed/",
+    "site_url": "https://www.twosigma.com/insights/",
+    "signal_score": 0.95,
+    "notes": "Technical deep dives from a leading quant fund on data science in finance."
+  },
+  {
+    "name": "Bloomberg Technology",
+    "type": "news",
+    "category": "news_finance_tech",
+    "source": "media",
+    "rss_url": "https://feeds.bloomberg.com/technology/news.rss",
+    "site_url": "https://www.bloomberg.com/technology",
+    "signal_score": 0.9,
+    "notes": "Intersection of markets and tech; tracking AI impact on stock prices."
+  }
+]

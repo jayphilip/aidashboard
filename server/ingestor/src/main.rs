@@ -2,6 +2,7 @@ mod config;
 mod db;
 mod models;
 mod sources;
+mod topics;
 
 use anyhow::Result;
 use config::Config;
@@ -34,7 +35,7 @@ async fn main() -> Result<()> {
 
     // Single ingestion cycle (no loop)
     log::info!("Starting single ingestion cycle (cron mode)...");
-    match run_ingestion_cycle(&pool, &config.arxiv_api_url).await {
+    match run_ingestion_cycle(&pool).await {
         Ok(count) => {
             log::info!("Ingestion cycle completed: {} items inserted/updated", count);
         }

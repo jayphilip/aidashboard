@@ -1,4 +1,4 @@
-use crate::db::{get_or_create_source, insert_or_update_item};
+use crate::db::insert_or_update_item;
 use crate::models::Item;
 
 // Legacy Paper struct - kept for backwards compatibility during migration
@@ -69,29 +69,19 @@ struct Link {
     title: Option<String>,
 }
 
-pub async fn run_arxiv_ingestion(pool: &PgPool, arxiv_api_url: &str) -> Result<u64> {
-    log::info!("Starting ArXiv ingestion...");
+pub async fn run_arxiv_ingestion(pool: &PgPool, source: &crate::models::Source) -> Result<u64> {
+    let arxiv_api_url = match &source.ingest_url {
+        Some(url) => url,
+        None => {
+            log::warn!("ArXiv source {} has no ingest_url, skipping", source.name);
+            return Ok(0);
+        }
+    };
 
-    // Get or create the arxiv source
-    let meta = serde_json::json!({
-        "query": "cat:q-fin.GN",
-        "description": "arXiv Finance papers - Quantitative Finance category"
-    });
-    
-    let source = get_or_create_source(
-        pool,
-        "arxiv-qfin",
-        "arxiv",
-        "paper",
-        Some(arxiv_api_url),
-        meta,
-    )
-    .await?;
-
-    log::info!("Using source: {} (id: {})", source.name, source.id);
+    log::info!("Starting ArXiv ingestion for source: {}", source.name);
 
     // Fetch recent papers from arXiv
-    let items = fetch_arxiv_items(&source, arxiv_api_url).await?;
+    let items = fetch_arxiv_items(source, arxiv_api_url).await?;
 
     log::info!("Fetched {} items from ArXiv", items.len());
 
@@ -105,7 +95,7 @@ pub async fn run_arxiv_ingestion(pool: &PgPool, arxiv_api_url: &str) -> Result<u
         }
     }
 
-    log::info!("Successfully inserted/updated {} items", inserted);
+    log::info!("Successfully inserted/updated {} items from source: {}", inserted, source.name);
 
     Ok(inserted)
 }
