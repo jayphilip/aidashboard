@@ -1,22 +1,34 @@
 // web/src/lib/config.ts
 /**
- * Runtime configuration loader
- * Reads from import.meta.env with fallback to window variables
+ * Configuration passed from server via page load
  */
+export let serverConfig: {
+  publicElectricUrl?: string;
+  publicElectricSecret?: string;
+} = {};
+
+export function setServerConfig(config: typeof serverConfig) {
+  serverConfig = config;
+}
 
 export function getElectricUrl(): string {
-  // Try import.meta.env first
-  let url = import.meta.env.PUBLIC_ELECTRIC_URL;
+  // Try server config first (passed from +layout.server.ts)
+  let url = serverConfig.publicElectricUrl;
 
+  // Try import.meta.env
+  if (!url) {
+    url = import.meta.env.PUBLIC_ELECTRIC_URL;
+  }
+
+  // Fallback to window variable
   if (!url && typeof window !== 'undefined') {
-    // Fallback to window.__ELECTRIC_URL__ if set by HTML
     url = (window as any).__ELECTRIC_URL__;
   }
 
   if (!url) {
     throw new Error(
       'PUBLIC_ELECTRIC_URL not configured. ' +
-      'Set PUBLIC_ELECTRIC_URL in .env.local and restart dev server, or via window.__ELECTRIC_URL__'
+      'Set PUBLIC_ELECTRIC_URL in .env.local and restart dev server.'
     );
   }
 
@@ -24,7 +36,11 @@ export function getElectricUrl(): string {
 }
 
 export function getElectricSecret(): string {
-  let secret = import.meta.env.PUBLIC_ELECTRIC_API_SECRET;
+  let secret = serverConfig.publicElectricSecret;
+
+  if (!secret) {
+    secret = import.meta.env.PUBLIC_ELECTRIC_API_SECRET;
+  }
 
   if (!secret && typeof window !== 'undefined') {
     secret = (window as any).__ELECTRIC_SECRET__;

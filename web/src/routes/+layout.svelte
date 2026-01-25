@@ -2,8 +2,19 @@
   import '$lib/styles/app.css';  // path must match the real file
   import favicon from '$lib/assets/favicon.svg';
   import Navigation from '$lib/components/Navigation.svelte';
+  import { setServerConfig } from '$lib/config';
 
-  let { children } = $props();
+  let { children, data } = $props();
+
+  // Inject server-side config into client
+  $effect.pre(() => {
+    if (data?.publicElectricUrl) {
+      setServerConfig({
+        publicElectricUrl: data.publicElectricUrl,
+        publicElectricSecret: data.publicElectricSecret,
+      });
+    }
+  });
 </script>
 
 <svelte:head>
