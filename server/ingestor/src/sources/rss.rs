@@ -101,8 +101,12 @@ fn entry_to_item(entry: feed_rs::model::Entry, source: &crate::models::Source) -
                 .and_then(|content| content.body.clone())
                 .map(|body| {
                     // Limit summary to first 500 chars
-                    if body.len() > 500 {
-                        format!("{}...", &body[..500])
+                    let truncated = body
+                        .chars()
+                        .take(500)
+                        .collect::<String>();
+                    if truncated.len() < body.len() {
+                        format!("{}...", truncated)
                     } else {
                         body
                     }
@@ -115,8 +119,12 @@ fn entry_to_item(entry: feed_rs::model::Entry, source: &crate::models::Source) -
             .body
             .as_ref()
             .map(|b| {
-                if b.len() > 10000 {
-                    format!("{}...", &b[..10000])
+                let truncated = b
+                    .chars()
+                    .take(10000)
+                    .collect::<String>();
+                if truncated.len() < b.len() {
+                    format!("{}...", truncated)
                 } else {
                     b.clone()
                 }
