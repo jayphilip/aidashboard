@@ -31,6 +31,11 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool> {
         .connect(database_url)
         .await?;
 
+    // Run migrations on startup
+    sqlx::migrate!("../migrations")
+        .run(&pool)
+        .await?;
+
     Ok(pool)
 }
 

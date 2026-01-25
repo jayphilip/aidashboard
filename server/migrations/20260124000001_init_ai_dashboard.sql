@@ -1,5 +1,5 @@
 -- Create the papers table
-CREATE TABLE papers (
+CREATE TABLE IF NOT EXISTS papers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source TEXT NOT NULL,
     external_id TEXT NOT NULL,
@@ -15,7 +15,7 @@ CREATE TABLE papers (
     UNIQUE(source, external_id)
 );
 
--- Create indexes for common queries
-CREATE INDEX idx_papers_source ON papers(source);
-CREATE INDEX idx_papers_published_at ON papers(published_at DESC);
-CREATE INDEX idx_papers_external_id ON papers(external_id);
+-- Create indexes for common queries (if not exists)
+CREATE INDEX IF NOT EXISTS idx_papers_source ON papers(source);
+CREATE INDEX IF NOT EXISTS idx_papers_published_at ON papers(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_papers_external_id ON papers(external_id);
