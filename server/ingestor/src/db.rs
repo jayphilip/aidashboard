@@ -1,11 +1,11 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use std::time::Duration;
 use uuid::Uuid;
 
-use crate::models::{Item, Source, ItemTopic, ItemLike, Medium};
+use crate::models::{Item, Source, ItemTopic, ItemLike};
 
 // Legacy Paper struct - kept for backward compatibility during migration
 #[derive(Debug, Clone)]

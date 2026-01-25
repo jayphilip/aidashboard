@@ -6,7 +6,7 @@ mod sources;
 use anyhow::Result;
 use config::Config;
 use db::create_pool;
-use sources::run_arxiv_ingestion;
+use sources::run_ingestion_cycle;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -46,13 +46,13 @@ async fn ingestion_loop(pool: &sqlx::PgPool, config: &Config) -> Result<()> {
             config.ingestion_interval_secs
         );
 
-        // Run ArXiv ingestion
-        match run_arxiv_ingestion(pool, &config.arxiv_api_url).await {
+        // Run the generic ingestion dispatcher
+        match run_ingestion_cycle(pool, &config.arxiv_api_url).await {
             Ok(count) => {
-                log::info!("ArXiv ingestion completed: {} papers", count);
+                log::info!("Ingestion cycle completed: {} items inserted/updated", count);
             }
             Err(e) => {
-                log::error!("ArXiv ingestion failed: {}", e);
+                log::error!("Ingestion cycle failed: {}", e);
             }
         }
 

@@ -1,5 +1,22 @@
-use crate::db::{insert_or_update_paper, get_or_create_source, insert_or_update_item, Paper};
-use crate::models::{Item, Medium};
+use crate::db::{get_or_create_source, insert_or_update_item};
+use crate::models::Item;
+
+// Legacy Paper struct - kept for backwards compatibility during migration
+#[derive(Debug, Clone)]
+struct Paper {
+    id: uuid::Uuid,
+    source: String,
+    external_id: String,
+    title: String,
+    authors: Vec<String>,
+    abstract_text: Option<String>,
+    categories: Vec<String>,
+    published_at: chrono::DateTime<chrono::Utc>,
+    url: Option<String>,
+    pdf_url: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
 use anyhow::Result;
 use chrono::DateTime;
 use quick_xml::de::from_str;

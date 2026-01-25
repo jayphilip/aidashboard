@@ -117,6 +117,7 @@ struct Item {
     published_at: DateTime<Utc>,
     raw_metadata: serde_json::Value,
 }
+```
 
 Implementation details:
 
@@ -127,6 +128,7 @@ Make Medium and SourceType serde-serializable for JSON fields / config if needed
 5. Create a generic ingestion dispatcher
 Replace a single ingest_arxiv() entrypoint with:
 
+```rust
 async fn run_ingestion_cycle(db: &DbPool) -> anyhow::Result<()> {
     let sources = load_active_sources(db).await?;
     for source in sources {
@@ -139,6 +141,10 @@ async fn run_ingestion_cycle(db: &DbPool) -> anyhow::Result<()> {
     }
     Ok(())
 }
+```
+
+Tasks:
+
 Each ingest_from_* function:
 
 Reads configuration from source (and source.meta). [web:447]
@@ -181,7 +187,8 @@ Ensure PGlite schema matches, so the browser can query everything locally.
 
 Remove or de-prioritize replication of legacy papers once the UI is migrated. [web:440][web:447]
 
-Phase 3 – Add newsletters and blogs via RSS
+## Phase 3 – Add newsletters and blogs via RSS
+
 8. Seed newsletter/blog sources
 Manually insert a small curated set of RSS-based sources into sources:
 
@@ -249,7 +256,8 @@ One row per (item, topic).
 
 You can later replace this with an embedding-based or ML classifier, without changing the schema. [web:452]
 
-Phase 4 – Dashboard UX
+## Phase 4 – Dashboard UX
+
 11. “Today” page (3 lanes)
 Build a main dashboard page with three lanes:
 
@@ -357,7 +365,7 @@ Add new sources (RSS URLs, etc.).
 
 This is standard for ingestion pipeline management. [web:444][web:450]
 
-Phase 5 – Tweets (optional, later)
+## Phase 5 – Tweets (optional, later)
 14. Add Twitter/X sources
 Insert new rows into sources for Twitter:
 
