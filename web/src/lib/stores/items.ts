@@ -109,7 +109,7 @@ export async function initializeItemsSync() {
     const electricSecret = getCachedElectricSecret();
 
     // Start syncing `items`, `sources`, `item_topics`, `item_likes` shapes into local tables
-    const authParams = electricSecret ? { token: electricSecret } : {};
+    const authHeaders = electricSecret ? { Authorization: `Bearer ${electricSecret}` } : {};
 
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
@@ -119,8 +119,8 @@ export async function initializeItemsSync() {
             table: 'items',
             subset__order_by: 'published_at DESC',
             subset__limit: 500,
-            ...authParams,
           },
+          headers: authHeaders,
         },
         table: 'items',
         primaryKey: ['id'],
@@ -138,8 +138,8 @@ export async function initializeItemsSync() {
           url: `${electricUrl}/v1/shape`,
           params: {
             table: 'sources',
-            ...authParams,
           },
+          headers: authHeaders,
         },
         table: 'sources',
         primaryKey: ['id'],
@@ -150,8 +150,8 @@ export async function initializeItemsSync() {
           url: `${electricUrl}/v1/shape`,
           params: {
             table: 'item_topics',
-            ...authParams,
           },
+          headers: authHeaders,
         },
         table: 'item_topics',
         primaryKey: ['id'],
@@ -162,8 +162,8 @@ export async function initializeItemsSync() {
           url: `${electricUrl}/v1/shape`,
           params: {
             table: 'item_likes',
-            ...authParams,
           },
+          headers: authHeaders,
         },
         table: 'item_likes',
         primaryKey: ['id'],

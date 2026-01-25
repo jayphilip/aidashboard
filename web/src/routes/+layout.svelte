@@ -8,11 +8,18 @@
 
   // Inject server-side config into client
   $effect.pre(() => {
+    console.log('Layout data:', data);
     if (data?.publicElectricUrl) {
+      console.log('Setting server config:', {
+        url: data.publicElectricUrl,
+        secret: data.publicElectricSecret ? 'SET' : 'NOT SET',
+      });
       setServerConfig({
         publicElectricUrl: data.publicElectricUrl,
         publicElectricSecret: data.publicElectricSecret,
       });
+    } else {
+      console.warn('No publicElectricUrl in layout data');
     }
   });
 </script>

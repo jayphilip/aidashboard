@@ -12,27 +12,36 @@ export function setServerConfig(config: typeof serverConfig) {
 }
 
 export function getElectricUrl(): string {
+  console.log('getElectricUrl - serverConfig:', serverConfig);
+
   // Try server config first (passed from +layout.server.ts)
   let url = serverConfig.publicElectricUrl;
+  if (url) {
+    console.log('Using server config URL:', url);
+    return url;
+  }
 
   // Try import.meta.env
-  if (!url) {
-    url = import.meta.env.PUBLIC_ELECTRIC_URL;
+  url = import.meta.env.PUBLIC_ELECTRIC_URL;
+  if (url) {
+    console.log('Using import.meta.env URL:', url);
+    return url;
   }
 
   // Fallback to window variable
-  if (!url && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined') {
     url = (window as any).__ELECTRIC_URL__;
+    if (url) {
+      console.log('Using window.__ELECTRIC_URL__:', url);
+      return url;
+    }
   }
 
-  if (!url) {
-    throw new Error(
-      'PUBLIC_ELECTRIC_URL not configured. ' +
-      'Set PUBLIC_ELECTRIC_URL in .env.local and restart dev server.'
-    );
-  }
-
-  return url;
+  console.error('No Electric URL found in any source');
+  throw new Error(
+    'PUBLIC_ELECTRIC_URL not configured. ' +
+    'Set PUBLIC_ELECTRIC_URL in .env.local and restart dev server.'
+  );
 }
 
 export function getElectricSecret(): string {
