@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo init:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo install:*)",
+      "Bash(docker compose:*)",
+      "Bash(export DATABASE_URL=postgresql://postgres:postgres@localhost:54321/aidashboard:*)",
+      "Bash(sqlx migrate run:*)",
+      "Bash(docker exec:*)",
+      "Bash(psql:*)",
+      "Bash(timeout 30 cargo run:*)",
+      "Bash(cargo run:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}
