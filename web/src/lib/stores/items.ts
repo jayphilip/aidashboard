@@ -5,7 +5,12 @@ import { desc, eq, gte, sql } from 'drizzle-orm';
 import { getPGlite, getDb } from '$lib/db';
 import { items, itemTopics, itemLikes, sources } from '$lib/schema';
 
-const ELECTRIC_URL = import.meta.env.PUBLIC_ELECTRIC_URL || 'http://localhost:3000';
+const ELECTRIC_URL = import.meta.env.PUBLIC_ELECTRIC_URL;
+const ELECTRIC_API_SECRET = import.meta.env.PUBLIC_ELECTRIC_API_SECRET || '';
+
+if (!ELECTRIC_URL) {
+  console.error('PUBLIC_ELECTRIC_URL not configured. Check .env.local file and restart dev server.');
+}
 
 export type Item = InferSelectModel<typeof items>;
 export type Source = InferSelectModel<typeof sources>;
@@ -108,6 +113,8 @@ export async function initializeItemsSync() {
     const pg = await getPGlite();
 
     // Start syncing `items`, `sources`, `item_topics`, `item_likes` shapes into local tables
+    const authParams = ELECTRIC_API_SECRET ? { token: ELECTRIC_API_SECRET } : {};
+
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
@@ -116,6 +123,7 @@ export async function initializeItemsSync() {
             table: 'items',
             subset__order_by: 'published_at DESC',
             subset__limit: 500,
+            ...authParams,
           },
         },
         table: 'items',
@@ -134,6 +142,7 @@ export async function initializeItemsSync() {
           url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'sources',
+            ...authParams,
           },
         },
         table: 'sources',
@@ -145,6 +154,7 @@ export async function initializeItemsSync() {
           url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'item_topics',
+            ...authParams,
           },
         },
         table: 'item_topics',
@@ -156,6 +166,7 @@ export async function initializeItemsSync() {
           url: `${ELECTRIC_URL}/v1/shape`,
           params: {
             table: 'item_likes',
+            ...authParams,
           },
         },
         table: 'item_likes',
