@@ -121,10 +121,11 @@ pub async fn run_arxiv_ingestion(pool: &PgPool, source: &crate::models::Source) 
 }
 
 async fn fetch_arxiv_items(source: &crate::models::Source, arxiv_api_url: &str) -> Result<Vec<Item>> {
-    // Query for papers in Quantitative Finance category
-    let query = "cat:q-fin.GN";
+    // Query for papers in AI, ML, and Quantitative Finance categories
+    // Increased max_results from 100 to 500 to get more papers
+    let query = "cat:cs.AI OR cat:cs.LG OR (cat:q-fin.GN AND (all:AI OR all:machine))";
     let url = format!(
-        "{}?search_query={}&start=0&max_results=100&sortBy=submittedDate&sortOrder=descending",
+        "{}?search_query={}&start=0&max_results=500&sortBy=submittedDate&sortOrder=descending",
         arxiv_api_url,
         urlencoding::encode(query)
     );
