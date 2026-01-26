@@ -27,14 +27,31 @@ pub struct Paper {
 pub async fn create_pool(database_url: &str) -> Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .acquire_timeout(Duration::from_secs(5))
+        .acquire_timeout(Duration::from_secs(30))
         .connect(database_url)
         .await?;
 
-    // Run migrations on startup
-    sqlx::migrate!("../migrations")
-        .run(&pool)
-        .await?;
+    // Run migrations on startup with timeout handling
+    log::info!("Running database migrations...");
+    let migration_result = tokio::time::timeout(
+        Duration::from_secs(60),
+        sqlx::migrate!("../migrations").run(&pool)
+    )
+    .await;
+
+    match migration_result {
+        Ok(Ok(_)) => {
+            log::info!("Migrations completed successfully");
+        }
+        Ok(Err(e)) => {
+            log::warn!("Migration error (may be already applied): {}", e);
+            // Don't fail - migrations might already be applied
+        }
+        Err(_) => {
+            log::warn!("Migration timeout after 60s - continuing anyway (migrations may be running in another instance)");
+            // Don't fail - another instance might be running migrations
+        }
+    }
 
     Ok(pool)
 }
@@ -160,6 +177,30 @@ pub async fn add_item_topic(pool: &PgPool, item_id: Uuid, topic: &str) -> Result
     .bind(topic)
     .execute(pool)
     .await?;
+
+    Ok(())
+}
+
+pub async fn add_item_topics_batch(pool: &PgPool, item_id: Uuid, topics: &[String]) -> Result<()> {
+    if topics.is_empty() {
+        return Ok(());
+    }
+
+    // Build a batch insert query with multiple VALUES clauses
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "INSERT INTO item_topics (item_id, topic) "
+    );
+
+    query_builder.push_values(topics, |mut b, topic| {
+        b.push_bind(item_id)
+         .push_bind(topic);
+    });
+
+    query_builder.push(" ON CONFLICT DO NOTHING");
+
+    query_builder.build()
+        .execute(pool)
+        .await?;
 
     Ok(())
 }

@@ -32,11 +32,11 @@ pub async fn run_rss_ingestion(pool: &PgPool, source: &crate::models::Source) ->
             Ok(item_id) => {
                 inserted += 1;
 
-                // Extract and add topics
+                // Extract and add topics in batch
                 let topics = crate::topics::extract_topics(&item.title, item.summary.as_deref());
-                for topic in topics {
-                    if let Err(e) = crate::db::add_item_topic(pool, item_id, &topic).await {
-                        log::warn!("Failed to add topic '{}' for item {}: {}", topic, item.url, e);
+                if !topics.is_empty() {
+                    if let Err(e) = crate::db::add_item_topics_batch(pool, item_id, &topics).await {
+                        log::warn!("Failed to add topics for item {}: {}", item.url, e);
                     }
                 }
             }
