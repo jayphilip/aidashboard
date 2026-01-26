@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { initializeItemsSync, cleanupItemsSync } from '$lib/stores/items';
-  import { getTrendingTopics } from '$lib/stores/topics';
+  import { getTrendingTopics, getTopicsBySourceType } from '$lib/stores/topics';
   import type { TopicTrend } from '$lib/stores/topics';
   import TopicSparkline from '$lib/components/TopicSparkline.svelte';
 
@@ -16,8 +16,15 @@
       loading = true;
       error = null;
       const weeksBack = selectedTimeRange === '4weeks' ? 4 : selectedTimeRange === '3months' ? 12 : 8;
-      const trends = await getTrendingTopics(weeksBack);
-      topics = trends;
+
+      // Use filtered query if media type is selected
+      if (selectedMediaType === 'all') {
+        const trends = await getTrendingTopics(weeksBack);
+        topics = trends;
+      } else {
+        const trends = await getTopicsBySourceType(selectedMediaType, weeksBack);
+        topics = trends;
+      }
     } catch (err) {
       console.error('Failed to load topics:', err);
       // Don't show error - topics table might just be empty
@@ -59,6 +66,7 @@
         </select>
         <select
           bind:value={selectedMediaType}
+          on:change={loadTopics}
           class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-50"
         >
           <option value="all">All Media</option>
