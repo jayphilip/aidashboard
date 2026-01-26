@@ -163,7 +163,7 @@
   {/if}
 
   <div class="paper-footer">
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center justify-between gap-2 flex-col lg:flex-row">
       <span class="paper-date">{formatDate(item.publishedAt)}</span>
 
       <div class="flex gap-1.5">
