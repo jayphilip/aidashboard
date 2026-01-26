@@ -18,8 +18,8 @@
       // Wait longer for sync to complete
       await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Load items from the last 3 days by type
-      const recentItems = await getRecentItems(72);
+      // Load items from the last 7 days by type
+      const recentItems = await getRecentItems(168);
       console.log('[TodayPage] Recent items loaded:', recentItems.length);
       console.log('[TodayPage] Sample item:', recentItems[0]);
 
@@ -76,13 +76,13 @@
       </div>
     {/if}
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" class:hidden={!loading && papers.length === 0 && newsletters.length === 0 && tweets.length === 0}>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" class:hidden={!loading && papers.length === 0 && newsletters.length === 0 && tweets.length === 0}>
       <!-- Papers Lane -->
       <div class="flex flex-col">
-        <h2 class="text-2xl font-semibold mb-4 text-blue-400">📄 Papers</h2>
-        <div class="space-y-4 flex-1">
+        <h2 class="text-xl font-semibold mb-3 text-blue-400">📄 Papers</h2>
+        <div class="space-y-3">
           {#if papers.length === 0}
-            <p class="text-slate-400 text-center py-8">No papers in the last 3 days</p>
+            <p class="text-slate-400 text-center py-8">No papers in the last 7 days</p>
           {/if}
           {#each papers as item (item.id)}
             <ItemCard {item} />
@@ -92,10 +92,10 @@
 
       <!-- Newsletters/Blogs Lane -->
       <div class="flex flex-col">
-        <h2 class="text-2xl font-semibold mb-4 text-emerald-400">📰 Newsletters & Blogs</h2>
-        <div class="space-y-4 flex-1">
+        <h2 class="text-xl font-semibold mb-3 text-emerald-400">📰 Newsletters & Blogs</h2>
+        <div class="space-y-3">
           {#if newsletters.length === 0}
-            <p class="text-slate-400 text-center py-8">No newsletters/blogs in the last 3 days</p>
+            <p class="text-slate-400 text-center py-8">No newsletters/blogs in the last 7 days</p>
           {/if}
           {#each newsletters as item (item.id)}
             <ItemCard {item} />
@@ -105,10 +105,10 @@
 
       <!-- Social Lane -->
       <div class="flex flex-col">
-        <h2 class="text-2xl font-semibold mb-4 text-purple-400">🐦 Social</h2>
-        <div class="space-y-4 flex-1">
+        <h2 class="text-xl font-semibold mb-3 text-purple-400">🐦 Social</h2>
+        <div class="space-y-3">
           {#if tweets.length === 0}
-            <p class="text-slate-400 text-center py-8">No tweets in the last 3 days</p>
+            <p class="text-slate-400 text-center py-8">No tweets in the last 7 days</p>
           {/if}
           {#each tweets as item (item.id)}
             <ItemCard {item} />

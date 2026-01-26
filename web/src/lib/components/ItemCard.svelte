@@ -102,7 +102,11 @@
 
   function excerpt(text: string | null | undefined, length: number = 150): string {
     if (!text) return '';
-    return text.length > length ? text.substring(0, length) + '...' : text;
+    if (text.length <= length) return text;
+    // Try to break at a word boundary
+    const truncated = text.substring(0, length);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return (lastSpace > length * 0.8 ? truncated.substring(0, lastSpace) : truncated) + '...';
   }
 
   function formatDate(date: Date): string {
@@ -132,10 +136,15 @@
 
 <div class="card paper-card">
   <div class="paper-header">
-    <div>
-      <h3 class="paper-title">{item.title}</h3>
-      <p class="paper-source">{getSourceIcon()} {sourceName}</p>
+    <div class="flex items-start justify-between gap-2 mb-1">
+      <div class="flex-1">
+        <h3 class="paper-title">{item.title}</h3>
+      </div>
+      {#if item.rawMetadata?.categories}
+        <span class="paper-category-badge">{item.rawMetadata.categories[0]}</span>
+      {/if}
     </div>
+    <p class="paper-source">{getSourceIcon()} {sourceName}</p>
   </div>
 
   {#if item.summary}
@@ -145,34 +154,33 @@
   {/if}
 
   <div class="paper-footer">
-    <div class="flex items-center justify-between flex-wrap gap-2">
-      <span class="paper-tag">{formatDate(item.publishedAt)}</span>
-      {#if item.rawMetadata?.categories}
-        <span class="paper-tag">{item.rawMetadata.categories[0]}</span>
-      {/if}
-    </div>
+    <div class="flex items-center justify-between gap-2">
+      <span class="paper-date">{formatDate(item.publishedAt)}</span>
 
-    <div class="flex gap-2 mt-3">
-      <button
-        class="btn-secondary text-sm flex-1"
-        on:click={() => window.open(item.url, '_blank')}
-      >
-        Open
-      </button>
-      <button
-        class="btn text-sm px-3 py-1 {liked === 1 ? 'bg-emerald-600' : ''}"
-        on:click={() => toggleLike(1)}
-        disabled={loading}
-      >
-        👍 {liked === 1 ? '✓' : ''}
-      </button>
-      <button
-        class="btn text-sm px-3 py-1 {liked === -1 ? 'bg-red-600' : ''}"
-        on:click={() => toggleLike(-1)}
-        disabled={loading}
-      >
-        👎 {liked === -1 ? '✓' : ''}
-      </button>
+      <div class="flex gap-1.5">
+        <button
+          class="btn-icon {liked === 1 ? 'btn-liked' : ''}"
+          on:click={() => toggleLike(1)}
+          disabled={loading}
+          title="Like"
+        >
+          👍
+        </button>
+        <button
+          class="btn-icon {liked === -1 ? 'btn-disliked' : ''}"
+          on:click={() => toggleLike(-1)}
+          disabled={loading}
+          title="Dislike"
+        >
+          👎
+        </button>
+        <button
+          class="btn-primary"
+          on:click={() => window.open(item.url, '_blank')}
+        >
+          Open
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -180,65 +188,117 @@
 <style>
   :global(.paper-card) {
     min-height: auto;
-    padding: 1rem;
-  }
-
-  :global(.paper-header) {
-    margin-bottom: 0.75rem;
-  }
-
-  :global(.paper-title) {
-    font-size: 1rem;
-    line-height: 1.4;
-    margin: 0;
-  }
-
-  :global(.paper-source) {
-    font-size: 0.875rem;
-    color: rgb(148, 163, 184);
-    margin-top: 0.25rem;
-  }
-
-  :global(.paper-abstract) {
-    font-size: 0.875rem;
-    line-height: 1.5;
-    margin: 0;
-  }
-
-  :global(.paper-footer) {
-    margin-top: 0.75rem;
-  }
-
-  :global(.paper-tag) {
-    font-size: 0.75rem;
-    background-color: rgb(51, 65, 85);
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    color: rgb(226, 232, 240);
-  }
-
-  :global(.btn) {
-    background-color: rgb(30, 41, 59);
-    color: rgb(226, 232, 240);
-    border: 1px solid rgb(71, 85, 105);
+    height: fit-content;
+    padding: 0.875rem;
+    background: rgb(30, 41, 59);
+    border: 1px solid rgb(51, 65, 85);
     border-radius: 0.375rem;
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    font-size: 0.875rem;
     transition: all 0.2s;
   }
 
-  :global(.btn:hover:not(:disabled)) {
+  :global(.paper-card:hover) {
+    border-color: rgb(71, 85, 105);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  :global(.paper-header) {
+    margin-bottom: 0.5rem;
+  }
+
+  :global(.paper-title) {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0;
+    color: rgb(241, 245, 249);
+  }
+
+  :global(.paper-source) {
+    font-size: 0.8125rem;
+    color: rgb(148, 163, 184);
+    margin: 0;
+  }
+
+  :global(.paper-category-badge) {
+    font-size: 0.6875rem;
+    background-color: rgb(71, 85, 105);
+    padding: 0.1875rem 0.5rem;
+    border-radius: 0.25rem;
+    color: rgb(203, 213, 225);
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  :global(.paper-content) {
+    margin-bottom: 0;
+    flex-shrink: 0;
+    height: auto;
+  }
+
+  :global(.paper-abstract) {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    margin: 0;
+    color: rgb(203, 213, 225);
+  }
+
+  :global(.paper-footer) {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgb(51, 65, 85);
+  }
+
+  :global(.paper-date) {
+    font-size: 0.6875rem;
+    color: rgb(148, 163, 184);
+    font-weight: 500;
+  }
+
+  :global(.btn-icon) {
     background-color: rgb(51, 65, 85);
+    color: rgb(226, 232, 240);
+    border: 1px solid rgb(71, 85, 105);
+    border-radius: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    cursor: pointer;
+    font-size: 0.9375rem;
+    transition: all 0.2s;
+    line-height: 1;
+  }
+
+  :global(.btn-icon:hover:not(:disabled)) {
+    background-color: rgb(71, 85, 105);
     border-color: rgb(100, 116, 139);
   }
 
-  :global(.btn-secondary) {
-    background-color: rgb(37, 99, 235);
-    border-color: rgb(37, 99, 235);
+  :global(.btn-icon:disabled) {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
-  :global(.btn-secondary:hover:not(:disabled)) {
-    background-color: rgb(29, 78, 216);
+  :global(.btn-liked) {
+    background-color: rgb(5, 150, 105);
+    border-color: rgb(5, 150, 105);
+  }
+
+  :global(.btn-disliked) {
+    background-color: rgb(220, 38, 38);
+    border-color: rgb(220, 38, 38);
+  }
+
+  :global(.btn-primary) {
+    background-color: rgb(59, 130, 246);
+    color: white;
+    border: none;
+    border-radius: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  :global(.btn-primary:hover) {
+    background-color: rgb(37, 99, 235);
   }
 </style>
