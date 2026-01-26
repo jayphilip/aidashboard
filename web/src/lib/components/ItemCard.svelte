@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Item } from '$lib/stores/items';
+  import { userId } from '$lib/stores/user';
   import { getDb } from '$lib/db';
   import { itemLikes, sources } from '$lib/schema';
   import { eq, and } from 'drizzle-orm';
@@ -10,9 +11,15 @@
   let liked: number | null = null;
   let sourceName = 'Unknown';
   let loading = false;
+  let currentUserId: string = '';
 
   onMount(async () => {
     try {
+      // Subscribe to user ID
+      userId.subscribe(id => {
+        currentUserId = id;
+      })();
+
       const db = await getDb();
       // Get the user like status
       const result = await db
@@ -20,7 +27,7 @@
         .from(itemLikes)
         .where(and(
           eq(itemLikes.itemId, item.id),
-          eq(itemLikes.userId, 'current-user') // TODO: implement real user tracking
+          eq(itemLikes.userId, currentUserId)
         ))
         .limit(1);
 
@@ -49,7 +56,6 @@
 
     try {
       const db = await getDb();
-      const userId = 'current-user'; // TODO: implement real user tracking
 
       // Check if like exists
       const existing = await db
@@ -57,7 +63,7 @@
         .from(itemLikes)
         .where(and(
           eq(itemLikes.itemId, item.id),
-          eq(itemLikes.userId, userId)
+          eq(itemLikes.userId, currentUserId)
         ))
         .limit(1);
 
@@ -69,7 +75,7 @@
             .delete(itemLikes)
             .where(and(
               eq(itemLikes.itemId, item.id),
-              eq(itemLikes.userId, userId)
+              eq(itemLikes.userId, currentUserId)
             ));
           liked = null;
         } else {
@@ -79,14 +85,14 @@
             .set({ score, createdAt: new Date() })
             .where(and(
               eq(itemLikes.itemId, item.id),
-              eq(itemLikes.userId, userId)
+              eq(itemLikes.userId, currentUserId)
             ));
           liked = score;
         }
       } else {
         // Insert
         await db.insert(itemLikes).values({
-          userId,
+          userId: currentUserId,
           itemId: item.id,
           score,
           createdAt: new Date(),

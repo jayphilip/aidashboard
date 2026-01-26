@@ -81,7 +81,8 @@ export function getDb() {
           user_id TEXT NOT NULL,
           item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
           score INTEGER CHECK (score IN (-1, 0, 1)),
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(user_id, item_id)
         );
 
         CREATE INDEX IF NOT EXISTS idx_sources_active ON sources(active);

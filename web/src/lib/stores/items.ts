@@ -1,9 +1,10 @@
 // web/src/lib/stores/items.ts
-import { writable, type Readable } from 'svelte/store';
+import { writable, type Readable, get } from 'svelte/store';
 import type { InferSelectModel } from 'drizzle-orm';
-import { desc, eq, gte, lte, sql, inArray, and } from 'drizzle-orm';
+import { desc, eq, gte, lte, sql, inArray, and, isNull } from 'drizzle-orm';
 import { getPGlite, getDb } from '$lib/db';
 import { items, itemTopics, itemLikes, sources } from '$lib/schema';
+import { userId } from './user';
 
 export type Item = InferSelectModel<typeof items>;
 export type Source = InferSelectModel<typeof sources>;
@@ -107,6 +108,7 @@ export interface SearchOptions {
   };
   topics?: string[];
   sourceIds?: number[];
+  likeStatus?: 'liked' | 'disliked' | 'unrated' | null;  // Filter by user's like/dislike status
   limit?: number;
   offset?: number;
 }
@@ -124,6 +126,7 @@ export async function searchItems(options: SearchOptions): Promise<Item[]> {
     dateRange,
     topics,
     sourceIds,
+    likeStatus,
     limit = 50,
     offset = 0,
   } = options;
@@ -164,26 +167,57 @@ export async function searchItems(options: SearchOptions): Promise<Item[]> {
     conditions.push(inArray(items.sourceId, sourceIds));
   }
 
-  // Filter by topics (requires join)
-  let rows: Item[] = [];
-  if (topics && topics.length > 0) {
-    let qb: any = db
-      .select({ item: items })
-      .from(items)
-      .innerJoin(itemTopics, eq(items.id, itemTopics.itemId));
+  // Get current user ID for like filtering
+  const currentUserId = get(userId);
 
-    // Combine topic filter with other conditions
-    const topicCondition = inArray(itemTopics.topic, topics);
-    if (conditions.length > 0) {
-      qb = qb.where(and(topicCondition, ...conditions));
+  // Filter by topics and/or likes (may require joins)
+  let rows: Item[] = [];
+  const needsTopicJoin = topics && topics.length > 0;
+  const needsLikeJoin = likeStatus !== null && likeStatus !== undefined;
+
+  if (needsTopicJoin || needsLikeJoin) {
+    let qb: any = db.select({ item: items });
+
+    if (needsTopicJoin) {
+      qb = qb.from(items).innerJoin(itemTopics, eq(items.id, itemTopics.itemId));
+    } else if (needsLikeJoin) {
+      // Left join for likes so we can filter by missing entries
+      qb = qb.from(items).leftJoin(itemLikes, and(eq(items.id, itemLikes.itemId), eq(itemLikes.userId, currentUserId)));
     } else {
-      qb = qb.where(topicCondition);
+      qb = qb.from(items);
     }
 
-    const topicResults = await qb.groupBy(items.id).orderBy(desc(items.publishedAt));
-    rows = topicResults.map((r: any) => r.item);
+    // Build filter conditions
+    let allConditions = [...conditions];
+
+    // Add topic condition if needed
+    if (needsTopicJoin) {
+      allConditions.push(inArray(itemTopics.topic, topics!));
+    }
+
+    // Add like status condition if needed
+    if (needsLikeJoin) {
+      if (likeStatus === 'liked') {
+        allConditions.push(eq(itemLikes.score, 1));
+      } else if (likeStatus === 'disliked') {
+        allConditions.push(eq(itemLikes.score, -1));
+      } else if (likeStatus === 'unrated') {
+        // For unrated items, check if the join resulted in NULL (no like entry for this user)
+        allConditions.push(isNull(itemLikes.id));
+      }
+    }
+
+    // Apply conditions
+    if (allConditions.length > 0) {
+      qb = qb.where(and(...allConditions));
+    }
+
+    // Group and sort
+    qb = qb.groupBy(items.id).orderBy(desc(items.publishedAt));
+    const results = await qb;
+    rows = results.map((r: any) => r.item);
   } else {
-    // No topic filter, use regular query
+    // No topic or like filter, use regular query
     let qb: any = db.select().from(items);
 
     // Apply all conditions with a single where() using and()

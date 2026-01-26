@@ -2,19 +2,30 @@ import { PUBLIC_ELECTRIC_URL } from '$env/static/public';
 import { ELECTRIC_API_SECRET, ELECTRIC_SECRET } from '$env/static/private';
 import type { RequestHandler } from './$types';
 
+/**
+ * Resolves the Electric secret to use for authentication
+ * Priority: ELECTRIC_API_SECRET -> ELECTRIC_SECRET
+ */
+function getElectricSecret(): string | undefined {
+  return ELECTRIC_API_SECRET ?? ELECTRIC_SECRET;
+}
+
 export const GET: RequestHandler = async ({ url }) => {
   // 1. Build the upstream URL
   const electricUrl = new URL(`${PUBLIC_ELECTRIC_URL}/v1/shape`);
   url.searchParams.forEach((value, key) => {
     electricUrl.searchParams.set(key, value);
   });
+  // Always include offset=-1 if not present
+  if (!electricUrl.searchParams.has('offset')) {
+    electricUrl.searchParams.set('offset', '-1');
+  }
 
   try {
     const headers: Record<string, string> = {};
 
     // 2. Resolve the Secret
-    // Priority: ELECTRIC_API_SECRET -> ELECTRIC_SECRET
-    const secret = ELECTRIC_API_SECRET ?? ELECTRIC_SECRET;
+    const secret = getElectricSecret();
 
     // Debug Log: Check if secret is loaded (don't log the actual secret)
     console.log('[Electric Proxy] Secret loaded?', !!secret);
@@ -54,7 +65,7 @@ export const GET: RequestHandler = async ({ url }) => {
     ];
 
     electricHeaders.set('Access-Control-Allow-Origin', '*');
-    electricHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    electricHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     electricHeaders.set('Access-Control-Expose-Headers', exposeHeaders.join(', '));
 
     return new Response(electricResponse.body, {
@@ -66,7 +77,80 @@ export const GET: RequestHandler = async ({ url }) => {
   } catch (error) {
     // 6. Log the REAL crash error to your terminal
     console.error('[Electric Proxy] CRITICAL ERROR:', error);
-    
+
+    return new Response(
+      JSON.stringify({
+        error: 'Proxy Internal Error',
+        details: error instanceof Error ? error.message : String(error)
+      }),
+      { status: 500 }
+    );
+  }
+};
+
+/**
+ * Handle write operations (POST/PUT/DELETE) for syncing local changes back to server.
+ * ElectricSQL uses POST to send write operations.
+ */
+export const POST: RequestHandler = async ({ url, request }) => {
+  try {
+    const electricUrl = new URL(`${PUBLIC_ELECTRIC_URL}/v1/shape`);
+    url.searchParams.forEach((value, key) => {
+      electricUrl.searchParams.set(key, value);
+    });
+
+    const secret = getElectricSecret();
+    console.log('[Electric Proxy] POST Secret loaded?', !!secret);
+    console.log('[Electric Proxy] POST Request URL:', electricUrl.pathname);
+
+    if (secret) {
+      electricUrl.searchParams.set('secret', secret);
+    } else {
+      console.warn('[Electric Proxy] WARNING: No ELECTRIC_SECRET found for write operation.');
+    }
+
+    // Forward the request body from the client
+    const body = await request.text();
+    console.log('[Electric Proxy] Forwarding POST to:', electricUrl.href.replace(/secret=[^&]+/, 'secret=***'));
+
+    const electricResponse = await fetch(electricUrl.href, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+
+    console.log('[Electric Proxy] POST Response status:', electricResponse.status);
+
+    // Process Response Headers
+    const electricHeaders = new Headers();
+    electricResponse.headers.forEach((value, key) => {
+      electricHeaders.set(key, value);
+    });
+
+    electricHeaders.delete('content-encoding');
+    electricHeaders.delete('content-length');
+
+    const exposeHeaders = [
+      'electric-handle', 'electric-schema', 'electric-offset',
+      'electric-shape-id', 'electric-chunk-last-offset',
+      'content-type', 'cache-control', 'electric-cursor', 'electric-up-to-date'
+    ];
+
+    electricHeaders.set('Access-Control-Allow-Origin', '*');
+    electricHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    electricHeaders.set('Access-Control-Expose-Headers', exposeHeaders.join(', '));
+
+    return new Response(electricResponse.body, {
+      status: electricResponse.status,
+      statusText: electricResponse.statusText,
+      headers: electricHeaders,
+    });
+
+  } catch (error) {
+    console.error('[Electric Proxy] POST CRITICAL ERROR:', error);
+
     return new Response(
       JSON.stringify({
         error: 'Proxy Internal Error',
@@ -82,7 +166,7 @@ export const OPTIONS: RequestHandler = async () => {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },
   });

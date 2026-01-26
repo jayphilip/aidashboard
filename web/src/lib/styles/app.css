@@ -29,10 +29,15 @@
 
   html {
     @apply antialiased;
+    height: 100%;
+    overflow-y: auto;
   }
 
   body {
     @apply transition-colors duration-200;
+    min-height: 100%;
+    height: auto;
+    overflow-y: auto;
   }
 }
 
