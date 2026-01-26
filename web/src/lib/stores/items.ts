@@ -61,9 +61,13 @@ export async function getItemsBySourceType(sourceType: string): Promise<Item[]> 
 }
 
 /**
- * Get items from the last N hours
+ * Get items from the last N hours with pagination support
  */
-export async function getRecentItems(hours: number = 24): Promise<Item[]> {
+export async function getRecentItems(
+  hours: number = 24,
+  limit: number = 50,
+  offset: number = 0
+): Promise<Item[]> {
   try {
     const db = await getDb();
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -72,7 +76,9 @@ export async function getRecentItems(hours: number = 24): Promise<Item[]> {
       .select()
       .from(items)
       .where(gte(items.publishedAt, cutoff))
-      .orderBy(desc(items.publishedAt));
+      .orderBy(desc(items.publishedAt))
+      .limit(limit)
+      .offset(offset);
     return rows;
   } catch (err) {
     logger.warn('Failed to get recent items, returning empty array:', err);
@@ -112,6 +118,7 @@ export interface SearchOptions {
   likeStatus?: 'liked' | 'disliked' | 'unrated' | null;  // Filter by user's like/dislike status
   limit?: number;
   offset?: number;
+  page?: number;  // Page number (1-indexed)
 }
 
 /**

@@ -40,6 +40,10 @@ export function filtersToParams(filters: SearchOptions): URLSearchParams {
     params.set('like', filters.likeStatus);
   }
 
+  if (filters.page && filters.page > 1) {
+    params.set('page', String(filters.page));
+  }
+
   return params;
 }
 
@@ -92,6 +96,14 @@ export function paramsToFilters(params: URLSearchParams): SearchOptions {
   const like = params.get('like');
   if (like && ['liked', 'disliked', 'unrated'].includes(like)) {
     filters.likeStatus = like as 'liked' | 'disliked' | 'unrated';
+  }
+
+  const page = params.get('page');
+  if (page) {
+    const pageNum = parseInt(page, 10);
+    if (!isNaN(pageNum) && pageNum >= 1) {
+      filters.page = pageNum;
+    }
   }
 
   return filters;

@@ -8,24 +8,45 @@
   import type { Item } from '$lib/stores/items';
   import FilterPanel from '$lib/components/filters/FilterPanel.svelte';
   import ItemCard from '$lib/components/ItemCard.svelte';
+  import PaginationControls from '$lib/components/PaginationControls.svelte';
 
   let items: Item[] = [];
   let loading = true;
   let error: string | null = null;
   let filters: SearchOptions = {};
   let totalResults = 0;
+  let currentPage = 1;
+  let hasMore = false;
 
-  async function performSearch(searchFilters?: SearchOptions) {
+  async function performSearch(searchFilters?: SearchOptions, pageNum: number = 1, append: boolean = false) {
     loading = true;
     error = null;
 
     try {
+      const pageSize = 50;
+      const offset = (pageNum - 1) * pageSize;
+
       // Use provided filters or parse from URL
       const filtersToUse = searchFilters || paramsToFilters($page.url.searchParams);
       console.log('[Search] performSearch: using filters:', filtersToUse);
-      items = await searchItems(filtersToUse);
-      console.log('[Search] performSearch: got', items.length, 'results');
+      const newItems = await searchItems({ ...filtersToUse, limit: pageSize, offset });
+      console.log('[Search] performSearch: got', newItems.length, 'results');
+
+      if (append) {
+        items = [...items, ...newItems];
+      } else {
+        items = newItems;
+      }
+
+      hasMore = newItems.length === pageSize;
+      currentPage = pageNum;
       totalResults = items.length;
+
+      // Update URL with page number if not first page
+      if (pageNum > 1) {
+        const params = filtersToParams({ ...filters, page: pageNum });
+        await goto(`/search?${params.toString()}`, { replaceState: true });
+      }
     } catch (err) {
       console.error('Search failed:', err);
       error = (err as Error).message || 'Search failed';
@@ -39,14 +60,22 @@
     console.log('[Search] handleFiltersChange called with:', newFilters);
     filters = newFilters;
 
-    // Update URL with new filters
+    // Reset pagination when filters change
+    currentPage = 1;
+    items = [];
+
+    // Update URL with new filters (reset page to 1)
     const params = filtersToParams(filters);
     console.log('[Search] Updated URL params:', params.toString());
     await goto(`/search?${params.toString()}`, { replaceState: true });
 
     // Perform search with new filters
     console.log('[Search] Calling performSearch with filters:', filters);
-    await performSearch(filters);
+    await performSearch(filters, 1, false);
+  }
+
+  async function handleLoadMore() {
+    await performSearch(filters, currentPage + 1, true);
   }
 
   onMount(() => {
@@ -55,11 +84,12 @@
         await initializeItemsSync();
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // Initialize filters from URL params
+        // Initialize filters and page from URL params
         filters = paramsToFilters($page.url.searchParams);
+        currentPage = filters.page || 1;
 
         // Perform search with initial filters
-        await performSearch(filters);
+        await performSearch(filters, currentPage, false);
       } catch (err) {
         console.error('Initialization failed:', err);
         error = 'Failed to initialize search';
@@ -139,12 +169,15 @@
             {/each}
           </div>
 
-          <!-- Load more hint -->
-          {#if totalResults >= 50}
-            <div class="mt-6 text-center text-slate-400 text-sm">
-              Showing first {totalResults} results
-            </div>
-          {/if}
+          <!-- Pagination controls -->
+          <PaginationControls
+            {currentPage}
+            itemsOnPage={items.length}
+            pageSize={50}
+            {loading}
+            {hasMore}
+            on:loadmore={handleLoadMore}
+          />
         {/if}
       </div>
     </div>
