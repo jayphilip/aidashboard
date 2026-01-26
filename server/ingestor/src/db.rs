@@ -103,12 +103,13 @@ pub async fn get_active_sources(pool: &PgPool) -> Result<Vec<Source>> {
 }
 
 // Item operations
-pub async fn insert_or_update_item(pool: &PgPool, item: &Item) -> Result<()> {
-    sqlx::query(
+pub async fn insert_or_update_item(pool: &PgPool, item: &Item) -> Result<Uuid> {
+    let result = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO items (id, source_id, source_type, title, url, summary, body, published_at, raw_metadata, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (source_id, url) DO UPDATE
-         SET title = $4, summary = $6, body = $7, published_at = $8, raw_metadata = $9, updated_at = $11"
+         SET title = $4, summary = $6, body = $7, published_at = $8, raw_metadata = $9, updated_at = $11
+         RETURNING id"
     )
     .bind(item.id)
     .bind(item.source_id)
@@ -121,10 +122,10 @@ pub async fn insert_or_update_item(pool: &PgPool, item: &Item) -> Result<()> {
     .bind(&item.raw_metadata)
     .bind(item.created_at)
     .bind(item.updated_at)
-    .execute(pool)
+    .fetch_one(pool)
     .await?;
 
-    Ok(())
+    Ok(result)
 }
 
 pub async fn get_items_by_source(pool: &PgPool, source_id: i32, limit: i64) -> Result<Vec<Item>> {

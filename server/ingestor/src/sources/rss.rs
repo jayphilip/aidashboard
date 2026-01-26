@@ -25,16 +25,19 @@ pub async fn run_rss_ingestion(pool: &PgPool, source: &crate::models::Source) ->
     // Insert or update each item in the database
     let mut inserted = 0;
     for item in items {
-        if let Err(e) = insert_or_update_item(pool, &item).await {
-            log::warn!("Failed to insert RSS item {}: {}", item.url, e);
-        } else {
-            inserted += 1;
+        match insert_or_update_item(pool, &item).await {
+            Err(e) => {
+                log::warn!("Failed to insert RSS item {}: {}", item.url, e);
+            }
+            Ok(item_id) => {
+                inserted += 1;
 
-            // Extract and add topics
-            let topics = crate::topics::extract_topics(&item.title, item.summary.as_deref());
-            for topic in topics {
-                if let Err(e) = crate::db::add_item_topic(pool, item.id, &topic).await {
-                    log::warn!("Failed to add topic '{}' for item {}: {}", topic, item.url, e);
+                // Extract and add topics
+                let topics = crate::topics::extract_topics(&item.title, item.summary.as_deref());
+                for topic in topics {
+                    if let Err(e) = crate::db::add_item_topic(pool, item_id, &topic).await {
+                        log::warn!("Failed to add topic '{}' for item {}: {}", topic, item.url, e);
+                    }
                 }
             }
         }
