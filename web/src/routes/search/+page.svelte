@@ -49,21 +49,23 @@
     await performSearch(filters);
   }
 
-  onMount(async () => {
-    try {
-      await initializeItemsSync();
-      await new Promise(resolve => setTimeout(resolve, 500));
+  onMount(() => {
+    (async () => {
+      try {
+        await initializeItemsSync();
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Initialize filters from URL params
-      filters = paramsToFilters($page.url.searchParams);
+        // Initialize filters from URL params
+        filters = paramsToFilters($page.url.searchParams);
 
-      // Perform search with initial filters
-      await performSearch(filters);
-    } catch (err) {
-      console.error('Initialization failed:', err);
-      error = 'Failed to initialize search';
-      loading = false;
-    }
+        // Perform search with initial filters
+        await performSearch(filters);
+      } catch (err) {
+        console.error('Initialization failed:', err);
+        error = 'Failed to initialize search';
+        loading = false;
+      }
+    })();
 
     return () => {
       cleanupItemsSync();

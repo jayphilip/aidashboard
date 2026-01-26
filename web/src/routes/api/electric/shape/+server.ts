@@ -1,13 +1,13 @@
 import { PUBLIC_ELECTRIC_URL } from '$env/static/public';
-import { ELECTRIC_API_SECRET, ELECTRIC_SECRET } from '$env/static/private';
+import { ELECTRIC_SECRET } from '$env/static/private';
 import type { RequestHandler } from './$types';
+import { logger } from '$lib/utils/logger';
 
 /**
  * Resolves the Electric secret to use for authentication
- * Priority: ELECTRIC_API_SECRET -> ELECTRIC_SECRET
  */
 function getElectricSecret(): string | undefined {
-  return ELECTRIC_API_SECRET ?? ELECTRIC_SECRET;
+  return ELECTRIC_SECRET;
 }
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -28,25 +28,25 @@ export const GET: RequestHandler = async ({ url }) => {
     const secret = getElectricSecret();
 
     // Debug Log: Check if secret is loaded (don't log the actual secret)
-    console.log('[Electric Proxy] Secret loaded?', !!secret);
-    console.log('[Electric Proxy] Request URL:', electricUrl.pathname);
-    console.log('[Electric Proxy] Query params:', Object.fromEntries(url.searchParams));
+    logger.log('[Electric Proxy] Secret loaded?', !!secret);
+    logger.log('[Electric Proxy] Request URL:', electricUrl.pathname);
+    logger.log('[Electric Proxy] Query params:', Object.fromEntries(url.searchParams));
 
     if (secret) {
       // 3. Add ELECTRIC_SECRET as query parameter (ElectricSQL v1.0+ auth method)
       // The secret is added server-side in the proxy to keep it secure
       electricUrl.searchParams.set('secret', secret);
     } else {
-      console.warn('[Electric Proxy] WARNING: No ELECTRIC_SECRET found. Request will likely fail 401.');
+      logger.warn('[Electric Proxy] WARNING: No ELECTRIC_SECRET found. Request will likely fail 401.');
     }
 
     // 4. Forward the request
-    console.log('[Electric Proxy] Fetching from:', electricUrl.href.replace(/secret=[^&]+/, 'secret=***'));
+    logger.log('[Electric Proxy] Fetching from:', electricUrl.href.replace(/secret=[^&]+/, 'secret=***'));
     const electricResponse = await fetch(electricUrl.href, {
       method: 'GET',
       headers,
     });
-    console.log('[Electric Proxy] Response status:', electricResponse.status);
+    logger.log('[Electric Proxy] Response status:', electricResponse.status);
 
     // 5. Process Response Headers
     const electricHeaders = new Headers();
@@ -76,7 +76,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
   } catch (error) {
     // 6. Log the REAL crash error to your terminal
-    console.error('[Electric Proxy] CRITICAL ERROR:', error);
+    logger.error('[Electric Proxy] CRITICAL ERROR:', error);
 
     return new Response(
       JSON.stringify({
@@ -100,18 +100,18 @@ export const POST: RequestHandler = async ({ url, request }) => {
     });
 
     const secret = getElectricSecret();
-    console.log('[Electric Proxy] POST Secret loaded?', !!secret);
-    console.log('[Electric Proxy] POST Request URL:', electricUrl.pathname);
+    logger.log('[Electric Proxy] POST Secret loaded?', !!secret);
+    logger.log('[Electric Proxy] POST Request URL:', electricUrl.pathname);
 
     if (secret) {
       electricUrl.searchParams.set('secret', secret);
     } else {
-      console.warn('[Electric Proxy] WARNING: No ELECTRIC_SECRET found for write operation.');
+      logger.warn('[Electric Proxy] WARNING: No ELECTRIC_SECRET found for write operation.');
     }
 
     // Forward the request body from the client
     const body = await request.text();
-    console.log('[Electric Proxy] Forwarding POST to:', electricUrl.href.replace(/secret=[^&]+/, 'secret=***'));
+    logger.log('[Electric Proxy] Forwarding POST to:', electricUrl.href.replace(/secret=[^&]+/, 'secret=***'));
 
     const electricResponse = await fetch(electricUrl.href, {
       method: 'POST',
@@ -121,7 +121,7 @@ export const POST: RequestHandler = async ({ url, request }) => {
       body,
     });
 
-    console.log('[Electric Proxy] POST Response status:', electricResponse.status);
+    logger.log('[Electric Proxy] POST Response status:', electricResponse.status);
 
     // Process Response Headers
     const electricHeaders = new Headers();
@@ -149,7 +149,7 @@ export const POST: RequestHandler = async ({ url, request }) => {
     });
 
   } catch (error) {
-    console.error('[Electric Proxy] POST CRITICAL ERROR:', error);
+    logger.error('[Electric Proxy] POST CRITICAL ERROR:', error);
 
     return new Response(
       JSON.stringify({

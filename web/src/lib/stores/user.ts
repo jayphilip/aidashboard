@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { logger } from '$lib/utils/logger';
 
 const USER_ID_KEY = 'aidashboard_user_id';
 
@@ -13,10 +14,10 @@ function getUserId(): string {
 
   let userId = localStorage.getItem(USER_ID_KEY);
   if (!userId) {
-    // Generate a new user ID: "user_" + random hex string
-    userId = `user_${Math.random().toString(16).slice(2)}`;
+    // Generate a new user ID using crypto.randomUUID()
+    userId = `user_${crypto.randomUUID()}`;
     localStorage.setItem(USER_ID_KEY, userId);
-    console.log('[User Store] Created new user ID:', userId);
+    logger.log('[User Store] Created new user ID:', userId);
   }
   return userId;
 }
@@ -31,6 +32,6 @@ export function resetUserId() {
     localStorage.removeItem(USER_ID_KEY);
     const newId = getUserId();
     userId.set(newId);
-    console.log('[User Store] Reset user ID to:', newId);
+    logger.log('[User Store] Reset user ID to:', newId);
   }
 }

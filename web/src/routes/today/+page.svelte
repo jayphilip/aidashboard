@@ -86,15 +86,17 @@
     await loadAndFilterItems();
   }
 
-  onMount(async () => {
-    try {
-      await initializeItemsSync();
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await loadAndFilterItems();
-    } catch (err) {
-      console.error('Failed to initialize:', err);
-      error = (err as Error)?.message ?? String(err);
-    }
+  onMount(() => {
+    (async () => {
+      try {
+        await initializeItemsSync();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadAndFilterItems();
+      } catch (err) {
+        console.error('Failed to initialize:', err);
+        error = (err as Error)?.message ?? String(err);
+      }
+    })();
 
     return () => {
       cleanupItemsSync();

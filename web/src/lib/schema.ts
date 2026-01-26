@@ -10,6 +10,13 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core';
 
+// Type for raw metadata stored in items
+export interface ItemRawMetadata {
+  categories?: string[];
+  authors?: string[];
+  [key: string]: any;
+}
+
 // If you want stricter typing for arrays you can also use $type<string[]>()
 export const papers = pgTable('papers', {
   id: uuid('id').primaryKey().notNull(),
@@ -66,7 +73,7 @@ export const items = pgTable('items', {
   summary: text('summary'),
   body: text('body'),
   publishedAt: timestamp('published_at', { mode: 'date' }).notNull(),
-  rawMetadata: jsonb('raw_metadata').default({} as any),
+  rawMetadata: jsonb('raw_metadata').$type<ItemRawMetadata>().default({} as any),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
 });

@@ -25,3 +25,7 @@ dist/
 # Database
 *.db
 *.sqlite
+
+# Development artifacts
+.playwright-mcp/
+.claude/

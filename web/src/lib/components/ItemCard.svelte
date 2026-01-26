@@ -5,6 +5,7 @@
   import { getDb } from '$lib/db';
   import { itemLikes, sources } from '$lib/schema';
   import { eq, and } from 'drizzle-orm';
+  import { logger } from '$lib/utils/logger';
 
   export let item: Item;
 
@@ -46,7 +47,7 @@
         sourceName = sourceResult[0].name;
       }
     } catch (err) {
-      console.error('Failed to load like status:', err);
+      logger.error('Failed to load like status:', err);
     }
   });
 
@@ -100,7 +101,7 @@
         liked = score;
       }
     } catch (err) {
-      console.error('Failed to toggle like:', err);
+      logger.error('Failed to toggle like:', err);
     } finally {
       loading = false;
     }

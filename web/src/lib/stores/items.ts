@@ -5,6 +5,7 @@ import { desc, eq, gte, lte, sql, inArray, and, isNull } from 'drizzle-orm';
 import { getPGlite, getDb } from '$lib/db';
 import { items, itemTopics, itemLikes, sources } from '$lib/schema';
 import { userId } from './user';
+import { logger } from '$lib/utils/logger';
 
 export type Item = InferSelectModel<typeof items>;
 export type Source = InferSelectModel<typeof sources>;
@@ -36,7 +37,7 @@ async function refreshItemsFromDb() {
 
     itemsStore.set(rows);
   } catch (err) {
-    console.warn('Failed to refresh items from db:', err);
+    logger.warn('Failed to refresh items from db:', err);
     itemsStore.set([]);
   }
 }
@@ -54,7 +55,7 @@ export async function getItemsBySourceType(sourceType: string): Promise<Item[]> 
       .orderBy(desc(items.publishedAt));
     return rows;
   } catch (err) {
-    console.warn(`Failed to get items by source type ${sourceType}:`, err);
+    logger.warn(`Failed to get items by source type ${sourceType}:`, err);
     return [];
   }
 }
@@ -74,7 +75,7 @@ export async function getRecentItems(hours: number = 24): Promise<Item[]> {
       .orderBy(desc(items.publishedAt));
     return rows;
   } catch (err) {
-    console.warn('Failed to get recent items, returning empty array:', err);
+    logger.warn('Failed to get recent items, returning empty array:', err);
     return [];
   }
 }
@@ -262,7 +263,7 @@ export async function getAllTopics(): Promise<string[]> {
 
     return results.map(r => r.topic);
   } catch (err) {
-    console.warn('Failed to get topics:', err);
+    logger.warn('Failed to get topics:', err);
     return [];
   }
 }
@@ -285,7 +286,7 @@ export async function initializeItemsSync() {
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
     const proxyUrl = `${baseUrl}/api/electric/shape`;
 
-    console.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
+    logger.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
 
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
@@ -299,9 +300,9 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'items',
         onError: (error: unknown) => {
-          console.error('[ItemsSync] items shape sync error:', error);
+          logger.error('[ItemsSync] items shape sync error:', error);
           if (error instanceof Error) {
-            console.error('[ItemsSync] Error stack:', error.stack);
+            logger.error('[ItemsSync] Error stack:', error.stack);
           }
           stateStore.set({
             loading: false,
@@ -309,7 +310,7 @@ export async function initializeItemsSync() {
           });
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Items initial sync complete');
+          logger.log('[ItemsSync] Items initial sync complete');
         },
       }),
       (pg as any).electric.syncShapeToTable({
@@ -323,10 +324,10 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'sources',
         onError: (error: unknown) => {
-          console.error('[ItemsSync] sources shape sync error:', error);
+          logger.error('[ItemsSync] sources shape sync error:', error);
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Sources initial sync complete');
+          logger.log('[ItemsSync] Sources initial sync complete');
         },
       }),
       (pg as any).electric.syncShapeToTable({
@@ -340,10 +341,10 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'item_topics',
         onError: (error: unknown) => {
-          console.error('[ItemsSync] item_topics shape sync error:', error);
+          logger.error('[ItemsSync] item_topics shape sync error:', error);
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Item topics initial sync complete');
+          logger.log('[ItemsSync] Item topics initial sync complete');
         },
       }),
       (pg as any).electric.syncShapeToTable({
@@ -357,10 +358,10 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'item_likes',
         onError: (error: unknown) => {
-          console.error('[ItemsSync] item_likes shape sync error:', error);
+          logger.error('[ItemsSync] item_likes shape sync error:', error);
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Item likes initial sync complete');
+          logger.log('[ItemsSync] Item likes initial sync complete');
         },
       }),
     ]);
@@ -370,7 +371,7 @@ export async function initializeItemsSync() {
     shapeSubscriptions['item_topics'] = shapes[2];
     shapeSubscriptions['item_likes'] = shapes[3];
 
-    console.log('[ItemsSync] Shapes subscribed successfully');
+    logger.log('[ItemsSync] Shapes subscribed successfully');
 
     // Poll for data to arrive from Electric sync
     const pollForData = async () => {
@@ -383,14 +384,14 @@ export async function initializeItemsSync() {
             'SELECT COUNT(*)::int AS count FROM items;'
           );
           const count = countResult.rows[0]?.count ?? 0;
-          console.log('[ItemsSync] PGlite items count:', count, `(attempt ${attempts + 1}/${maxAttempts})`);
+          logger.log('[ItemsSync] PGlite items count:', count, `(attempt ${attempts + 1}/${maxAttempts})`);
 
           if (count > 0) {
             // Debug: Check published_at dates
             const dateCheckResult = await pg.query(
               'SELECT MIN(published_at) as oldest, MAX(published_at) as newest, COUNT(*) as total FROM items;'
             );
-            console.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
+            logger.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
 
             await refreshItemsFromDb();
             isSyncing = false;
@@ -403,7 +404,7 @@ export async function initializeItemsSync() {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
         } catch (err) {
-          console.warn('[ItemsSync] Error querying items (attempt', attempts + 1, '):', err);
+          logger.warn('[ItemsSync] Error querying items (attempt', attempts + 1, '):', err);
           attempts++;
           if (attempts < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -411,7 +412,7 @@ export async function initializeItemsSync() {
         }
       }
 
-      console.warn('[ItemsSync] Timeout waiting for data after 7.5 seconds');
+      logger.warn('[ItemsSync] Timeout waiting for data after 7.5 seconds');
       await refreshItemsFromDb();
       isSyncing = false;
       stateStore.set({ loading: false, error: null });
@@ -420,7 +421,7 @@ export async function initializeItemsSync() {
     // Start polling after initial sync has time to begin
     setTimeout(pollForData, 1000);
   } catch (err) {
-    console.error('initializeItemsSync failed', err);
+    logger.error('initializeItemsSync failed', err);
     isSyncing = false;
     stateStore.set({
       loading: false,

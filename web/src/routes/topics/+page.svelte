@@ -86,16 +86,18 @@
     applyFiltersAndSort();
   }
 
-  onMount(async () => {
-    try {
-      await initializeItemsSync();
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await loadTopics();
-    } catch (err) {
-      console.error('Initialization failed:', err);
-      // Don't show error - data might just be loading
-      loading = false;
-    }
+  onMount(() => {
+    (async () => {
+      try {
+        await initializeItemsSync();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await loadTopics();
+      } catch (err) {
+        console.error('Initialization failed:', err);
+        // Don't show error - data might just be loading
+        loading = false;
+      }
+    })();
 
     return () => {
       cleanupItemsSync();
