@@ -23,7 +23,11 @@
       "Bash(npm run prepare:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nConfigure ElectricSQL API secret and fix env loading\n\n- Add PUBLIC_ELECTRIC_URL and PUBLIC_ELECTRIC_API_SECRET to web/.env.local\n- Remove localhost:3000 fallback in items.ts to force explicit config\n- Add auth token parameter to shape sync requests\n- Fix error message for missing Electric URL\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nImplement runtime config loader for Electric environment variables\n\n- Create lib/config.ts with lazy-loaded Electric URL and secret getters\n- Update items.ts to use getCachedElectricUrl/Secret at runtime instead of module load\n- This avoids the import.meta.env loading issue by deferring to first use\n- Fallback to window.__ELECTRIC_URL__ if import.meta.env unavailable\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:electric-sql.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(node -e:*)",
+      "Bash(lsof:*)"
     ]
   }
 }

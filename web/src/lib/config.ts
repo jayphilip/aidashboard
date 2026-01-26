@@ -45,17 +45,10 @@ export function getElectricUrl(): string {
 }
 
 export function getElectricSecret(): string {
-  let secret = serverConfig.publicElectricSecret;
-
-  if (!secret) {
-    secret = import.meta.env.PUBLIC_ELECTRIC_API_SECRET;
-  }
-
-  if (!secret && typeof window !== 'undefined') {
-    secret = (window as any).__ELECTRIC_SECRET__;
-  }
-
-  return secret || '';
+  // Do NOT read or return a secret on the client. The proxy on the server
+  // will use a server-only env var. Expose only a presence indicator in
+  // `serverConfig.publicElectricSecret` if needed.
+  return '';
 }
 
 // Lazy-load to catch errors at runtime

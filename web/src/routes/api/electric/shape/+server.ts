@@ -18,6 +18,8 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Debug Log: Check if secret is loaded (don't log the actual secret)
     console.log('[Electric Proxy] Secret loaded?', !!secret);
+    console.log('[Electric Proxy] Request URL:', electricUrl.pathname);
+    console.log('[Electric Proxy] Query params:', Object.fromEntries(url.searchParams));
 
     if (secret) {
       // 3. Add ELECTRIC_SECRET as query parameter (ElectricSQL v1.0+ auth method)
@@ -28,10 +30,12 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     // 4. Forward the request
+    console.log('[Electric Proxy] Fetching from:', electricUrl.href.replace(/secret=[^&]+/, 'secret=***'));
     const electricResponse = await fetch(electricUrl.href, {
       method: 'GET',
       headers,
     });
+    console.log('[Electric Proxy] Response status:', electricResponse.status);
 
     // 5. Process Response Headers
     const electricHeaders = new Headers();

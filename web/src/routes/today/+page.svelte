@@ -15,17 +15,25 @@
     try {
       await initializeItemsSync();
 
-      // Wait a moment for sync to complete
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait longer for sync to complete
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Load items from the last 24 hours by type
-      const recentItems = await getRecentItems(24);
+      // Load items from the last 3 days by type
+      const recentItems = await getRecentItems(72);
+      console.log('[TodayPage] Recent items loaded:', recentItems.length);
+      console.log('[TodayPage] Sample item:', recentItems[0]);
+
+      // Debug: Check what sourceType values exist
+      const sourceTypes = new Set(recentItems.map(item => item.sourceType));
+      console.log('[TodayPage] Unique sourceType values:', Array.from(sourceTypes));
 
       papers = recentItems.filter(item => item.sourceType === 'paper');
       newsletters = recentItems.filter(
         item => item.sourceType === 'newsletter' || item.sourceType === 'blog'
       );
       tweets = recentItems.filter(item => item.sourceType === 'tweet');
+
+      console.log('[TodayPage] Filtered counts - papers:', papers.length, 'newsletters:', newsletters.length, 'tweets:', tweets.length);
 
       // Rank items by score
       papers = rankItems(papers).map(r => r.item);
@@ -47,7 +55,7 @@
 
 <div class="min-h-screen bg-slate-950 text-slate-50 p-6">
   <div class="max-w-full mx-auto">
-    <h1 class="text-4xl font-bold mb-8">Today's AI News</h1>
+    <h1 class="text-4xl font-bold mb-8">Recent AI News</h1>
 
     {#if loading}
       <div class="flex items-center justify-center py-12">
@@ -74,7 +82,7 @@
         <h2 class="text-2xl font-semibold mb-4 text-blue-400">📄 Papers</h2>
         <div class="space-y-4 flex-1">
           {#if papers.length === 0}
-            <p class="text-slate-400 text-center py-8">No papers today</p>
+            <p class="text-slate-400 text-center py-8">No papers in the last 3 days</p>
           {/if}
           {#each papers as item (item.id)}
             <ItemCard {item} />
@@ -87,7 +95,7 @@
         <h2 class="text-2xl font-semibold mb-4 text-emerald-400">📰 Newsletters & Blogs</h2>
         <div class="space-y-4 flex-1">
           {#if newsletters.length === 0}
-            <p class="text-slate-400 text-center py-8">No newsletters/blogs today</p>
+            <p class="text-slate-400 text-center py-8">No newsletters/blogs in the last 3 days</p>
           {/if}
           {#each newsletters as item (item.id)}
             <ItemCard {item} />
@@ -100,7 +108,7 @@
         <h2 class="text-2xl font-semibold mb-4 text-purple-400">🐦 Social</h2>
         <div class="space-y-4 flex-1">
           {#if tweets.length === 0}
-            <p class="text-slate-400 text-center py-8">No tweets yet</p>
+            <p class="text-slate-400 text-center py-8">No tweets in the last 3 days</p>
           {/if}
           {#each tweets as item (item.id)}
             <ItemCard {item} />

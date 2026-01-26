@@ -105,69 +105,89 @@ export async function initializeItemsSync() {
 
   try {
     const pg = await getPGlite();
-    const electricUrl = getCachedElectricUrl();
-    const electricSecret = getCachedElectricSecret();
 
-    // Start syncing `items`, `sources`, `item_topics`, `item_likes` shapes into local tables
-    const authHeaders = electricSecret ? { Authorization: `Bearer ${electricSecret}` } : {};
+    // Use the SvelteKit proxy endpoint instead of connecting directly to Electric
+    // This avoids CORS issues and keeps the secret server-side
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+    const proxyUrl = `${baseUrl}/api/electric/shape`;
+
+    console.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
 
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: `${electricUrl}/v1/shape`,
+          url: proxyUrl,
           params: {
             table: 'items',
-            subset__order_by: 'published_at DESC',
-            subset__limit: 500,
           },
-          headers: authHeaders,
         },
         table: 'items',
         primaryKey: ['id'],
         shapeKey: 'items',
         onError: (error: unknown) => {
-          console.error('items shape sync error', error);
+          console.error('[ItemsSync] items shape sync error:', error);
+          if (error instanceof Error) {
+            console.error('[ItemsSync] Error stack:', error.stack);
+          }
           stateStore.set({
             loading: false,
             error: (error as Error).message ?? String(error),
           });
         },
+        onInitialSync: () => {
+          console.log('[ItemsSync] Items initial sync complete');
+        },
       }),
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: `${electricUrl}/v1/shape`,
+          url: proxyUrl,
           params: {
             table: 'sources',
           },
-          headers: authHeaders,
         },
         table: 'sources',
         primaryKey: ['id'],
         shapeKey: 'sources',
+        onError: (error: unknown) => {
+          console.error('[ItemsSync] sources shape sync error:', error);
+        },
+        onInitialSync: () => {
+          console.log('[ItemsSync] Sources initial sync complete');
+        },
       }),
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: `${electricUrl}/v1/shape`,
+          url: proxyUrl,
           params: {
             table: 'item_topics',
           },
-          headers: authHeaders,
         },
         table: 'item_topics',
         primaryKey: ['id'],
         shapeKey: 'item_topics',
+        onError: (error: unknown) => {
+          console.error('[ItemsSync] item_topics shape sync error:', error);
+        },
+        onInitialSync: () => {
+          console.log('[ItemsSync] Item topics initial sync complete');
+        },
       }),
       (pg as any).electric.syncShapeToTable({
         shape: {
-          url: `${electricUrl}/v1/shape`,
+          url: proxyUrl,
           params: {
             table: 'item_likes',
           },
-          headers: authHeaders,
         },
         table: 'item_likes',
         primaryKey: ['id'],
         shapeKey: 'item_likes',
+        onError: (error: unknown) => {
+          console.error('[ItemsSync] item_likes shape sync error:', error);
+        },
+        onInitialSync: () => {
+          console.log('[ItemsSync] Item likes initial sync complete');
+        },
       }),
     ]);
 
@@ -176,26 +196,34 @@ export async function initializeItemsSync() {
     shapeSubscriptions['item_topics'] = shapes[2];
     shapeSubscriptions['item_likes'] = shapes[3];
 
-    // Wait briefly for initial snapshot to apply, then read from PGlite
+    console.log('[ItemsSync] Shapes subscribed successfully');
+
+    // Wait longer for initial snapshot to apply, then read from PGlite
     setTimeout(async () => {
       try {
         try {
           const countResult = await pg.query<{ count: number }>(
             'SELECT COUNT(*)::int AS count FROM items;'
           );
-          console.log('PGlite items count:', countResult.rows[0]?.count);
+          console.log('[ItemsSync] PGlite items count:', countResult.rows[0]?.count);
+
+          // Debug: Check published_at dates
+          const dateCheckResult = await pg.query(
+            'SELECT MIN(published_at) as oldest, MAX(published_at) as newest, COUNT(*) as total FROM items;'
+          );
+          console.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
         } catch (err) {
-          console.warn('Could not count items (table may not exist yet):', err);
+          console.warn('[ItemsSync] Could not count items (table may not exist yet):', err);
         }
 
         await refreshItemsFromDb();
         stateStore.set({ loading: false, error: null });
       } catch (err) {
-        console.error('refreshItemsFromDb failed', err);
+        console.error('[ItemsSync] refreshItemsFromDb failed', err);
         // Don't set error state - items table may just be empty or syncing
         stateStore.set({ loading: false, error: null });
       }
-    }, 1000);
+    }, 2000); // Increased to 2 seconds to allow more time for sync
   } catch (err) {
     console.error('initializeItemsSync failed', err);
     stateStore.set({
