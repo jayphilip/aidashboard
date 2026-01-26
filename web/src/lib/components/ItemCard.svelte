@@ -220,8 +220,6 @@
     line-height: 1.4;
     margin: 0;
     color: rgb(241, 245, 249);
-    overflow-wrap: break-word;
-    word-break: break-word;
   }
 
   :global(.paper-source) {
