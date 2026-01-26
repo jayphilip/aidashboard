@@ -198,32 +198,51 @@ export async function initializeItemsSync() {
 
     console.log('[ItemsSync] Shapes subscribed successfully');
 
-    // Wait longer for initial snapshot to apply, then read from PGlite
-    setTimeout(async () => {
-      try {
+    // Poll for data to arrive from Electric sync
+    const pollForData = async () => {
+      let attempts = 0;
+      const maxAttempts = 15; // 15 attempts * 500ms = 7.5 seconds
+
+      while (attempts < maxAttempts) {
         try {
           const countResult = await pg.query<{ count: number }>(
             'SELECT COUNT(*)::int AS count FROM items;'
           );
-          console.log('[ItemsSync] PGlite items count:', countResult.rows[0]?.count);
+          const count = countResult.rows[0]?.count ?? 0;
+          console.log('[ItemsSync] PGlite items count:', count, `(attempt ${attempts + 1}/${maxAttempts})`);
 
-          // Debug: Check published_at dates
-          const dateCheckResult = await pg.query(
-            'SELECT MIN(published_at) as oldest, MAX(published_at) as newest, COUNT(*) as total FROM items;'
-          );
-          console.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
+          if (count > 0) {
+            // Debug: Check published_at dates
+            const dateCheckResult = await pg.query(
+              'SELECT MIN(published_at) as oldest, MAX(published_at) as newest, COUNT(*) as total FROM items;'
+            );
+            console.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
+
+            await refreshItemsFromDb();
+            stateStore.set({ loading: false, error: null });
+            return;
+          }
+
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         } catch (err) {
-          console.warn('[ItemsSync] Could not count items (table may not exist yet):', err);
+          console.warn('[ItemsSync] Error querying items (attempt', attempts + 1, '):', err);
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
         }
-
-        await refreshItemsFromDb();
-        stateStore.set({ loading: false, error: null });
-      } catch (err) {
-        console.error('[ItemsSync] refreshItemsFromDb failed', err);
-        // Don't set error state - items table may just be empty or syncing
-        stateStore.set({ loading: false, error: null });
       }
-    }, 2000); // Increased to 2 seconds to allow more time for sync
+
+      console.warn('[ItemsSync] Timeout waiting for data after 7.5 seconds');
+      await refreshItemsFromDb();
+      stateStore.set({ loading: false, error: null });
+    };
+
+    // Start polling after initial sync has time to begin
+    setTimeout(pollForData, 1000);
   } catch (err) {
     console.error('initializeItemsSync failed', err);
     stateStore.set({

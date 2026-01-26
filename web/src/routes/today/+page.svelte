@@ -15,12 +15,17 @@
     try {
       await initializeItemsSync();
 
-      // Wait longer for sync to complete
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Wait for sync to complete - polling in items.ts will finish when data arrives
+      await new Promise(resolve => setTimeout(resolve, 5000));
 
       // Load items from the last 7 days by type
       const recentItems = await getRecentItems(168);
       console.log('[TodayPage] Recent items loaded:', recentItems.length);
+      console.log('[TodayPage] Breakdown:', {
+        papers: recentItems.filter(i => i.sourceType === 'paper').length,
+        newsletters: recentItems.filter(i => i.sourceType === 'newsletter' || i.sourceType === 'blog').length,
+        tweets: recentItems.filter(i => i.sourceType === 'tweet').length,
+      });
       console.log('[TodayPage] Sample item:', recentItems[0]);
 
       // Debug: Check what sourceType values exist
