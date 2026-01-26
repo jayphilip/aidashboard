@@ -136,13 +136,22 @@
 
 <div class="card paper-card">
   <div class="paper-header">
-    <div class="flex items-start justify-between gap-2 mb-1">
-      <div class="flex-1">
+    <div class="flex items-start gap-2 mb-2">
+      <div class="flex-1 min-w-0">
         <h3 class="paper-title">{item.title}</h3>
       </div>
-      {#if item.rawMetadata?.categories}
-        <span class="paper-category-badge">{item.rawMetadata.categories[0]}</span>
-      {/if}
+      <div class="flex items-center gap-1.5 flex-shrink-0">
+        {#if item.rawMetadata?.categories}
+          <span class="paper-category-badge">{item.rawMetadata.categories[0]}</span>
+        {/if}
+        <span class="paper-source-type">
+          {item.sourceType === 'paper' ? 'Paper'
+            : item.sourceType === 'tweet' ? 'Social'
+            : item.sourceType === 'blog' ? 'Blog'
+            : item.sourceType === 'newsletter' ? 'Newsletter'
+            : 'Other'}
+        </span>
+      </div>
     </div>
     <p class="paper-source">{getSourceIcon()} {sourceName}</p>
   </div>
@@ -211,6 +220,8 @@
     line-height: 1.4;
     margin: 0;
     color: rgb(241, 245, 249);
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
 
   :global(.paper-source) {
@@ -220,13 +231,27 @@
   }
 
   :global(.paper-category-badge) {
-    font-size: 0.6875rem;
+    font-size: 0.65rem;
     background-color: rgb(71, 85, 105);
-    padding: 0.1875rem 0.5rem;
+    padding: 0.15rem 0.4rem;
     border-radius: 0.25rem;
     color: rgb(203, 213, 225);
     white-space: nowrap;
     font-weight: 500;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
+  :global(.paper-source-type) {
+    font-size: 0.65rem;
+    background-color: rgba(15, 23, 42, 0.6);
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    color: rgb(203, 213, 225);
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: inline-block;
   }
 
   :global(.paper-content) {
