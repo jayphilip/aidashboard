@@ -1,10 +1,9 @@
 // web/src/lib/stores/items.ts
 import { writable, type Readable } from 'svelte/store';
 import type { InferSelectModel } from 'drizzle-orm';
-import { desc, eq, gte, sql } from 'drizzle-orm';
+import { desc, eq, gte, lte, sql, inArray, and } from 'drizzle-orm';
 import { getPGlite, getDb } from '$lib/db';
 import { items, itemTopics, itemLikes, sources } from '$lib/schema';
-import { getCachedElectricUrl, getCachedElectricSecret } from '$lib/config';
 
 export type Item = InferSelectModel<typeof items>;
 export type Source = InferSelectModel<typeof sources>;
@@ -23,6 +22,7 @@ export const items$: Readable<Item[]> = { subscribe: itemsStore.subscribe };
 export const itemsState: Readable<ItemsState> = { subscribe: stateStore.subscribe };
 
 let shapeSubscriptions: { [key: string]: { unsubscribe: () => void } } = {};
+let isSyncing = false;
 
 async function refreshItemsFromDb() {
   try {
@@ -88,7 +88,7 @@ export async function getItemsWithTopics(topics: string[]): Promise<Item[]> {
     .select({ item: items })
     .from(items)
     .innerJoin(itemTopics, eq(items.id, itemTopics.itemId))
-    .where(sql`${itemTopics.topic} = ANY(${topics})`)
+    .where(inArray(itemTopics.topic, topics))
     .groupBy(items.id)
     .orderBy(desc(items.publishedAt));
 
@@ -96,11 +96,151 @@ export async function getItemsWithTopics(topics: string[]): Promise<Item[]> {
 }
 
 /**
+ * Search options for flexible item filtering
+ */
+export interface SearchOptions {
+  query?: string;
+  sourceTypes?: string[];  // ['paper', 'newsletter', 'blog', 'tweet']
+  dateRange?: {
+    start?: Date;
+    end?: Date;
+  };
+  topics?: string[];
+  sourceIds?: number[];
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Search items with full-text search and filtering
+ * Searches title, summary, and body fields
+ * Supports filtering by source type, date range, topics, and sources
+ */
+export async function searchItems(options: SearchOptions): Promise<Item[]> {
+  const db = await getDb();
+  const {
+    query,
+    sourceTypes,
+    dateRange,
+    topics,
+    sourceIds,
+    limit = 50,
+    offset = 0,
+  } = options;
+
+  // Build WHERE conditions
+  const conditions: any[] = [];
+
+  // Text search on title, summary, body
+  if (query && query.trim()) {
+    const searchPattern = `%${query.toLowerCase()}%`;
+    conditions.push(
+      sql`(
+        LOWER(${items.title}) LIKE ${searchPattern}
+        OR LOWER(${items.summary}) LIKE ${searchPattern}
+        OR LOWER(${items.body}) LIKE ${searchPattern}
+      )`
+    );
+  }
+
+  // Filter by source types
+  if (sourceTypes && sourceTypes.length > 0) {
+    conditions.push(inArray(items.sourceType, sourceTypes));
+  }
+
+  // Filter by date range
+  if (dateRange?.start) {
+    conditions.push(gte(items.publishedAt, dateRange.start));
+  }
+  if (dateRange?.end) {
+    // Set end date to end of day (23:59:59) to include all items published that day
+    const endOfDay = new Date(dateRange.end);
+    endOfDay.setHours(23, 59, 59, 999);
+    conditions.push(lte(items.publishedAt, endOfDay));
+  }
+
+  // Filter by source IDs
+  if (sourceIds && sourceIds.length > 0) {
+    conditions.push(inArray(items.sourceId, sourceIds));
+  }
+
+  // Filter by topics (requires join)
+  let rows: Item[] = [];
+  if (topics && topics.length > 0) {
+    let qb: any = db
+      .select({ item: items })
+      .from(items)
+      .innerJoin(itemTopics, eq(items.id, itemTopics.itemId));
+
+    // Combine topic filter with other conditions
+    const topicCondition = inArray(itemTopics.topic, topics);
+    if (conditions.length > 0) {
+      qb = qb.where(and(topicCondition, ...conditions));
+    } else {
+      qb = qb.where(topicCondition);
+    }
+
+    const topicResults = await qb.groupBy(items.id).orderBy(desc(items.publishedAt));
+    rows = topicResults.map((r: any) => r.item);
+  } else {
+    // No topic filter, use regular query
+    let qb: any = db.select().from(items);
+
+    // Apply all conditions with a single where() using and()
+    if (conditions.length > 0) {
+      qb = qb.where(and(...conditions));
+    }
+
+    // Add sort
+    qb = qb.orderBy(desc(items.publishedAt));
+
+    rows = await qb;
+  }
+
+  // Sort: exact title match first, then by recency
+  rows.sort((a, b) => {
+    if (query) {
+      const queryLower = query.toLowerCase();
+      const aExact = a.title.toLowerCase() === queryLower ? 0 : 1;
+      const bExact = b.title.toLowerCase() === queryLower ? 0 : 1;
+      if (aExact !== bExact) return aExact - bExact;
+    }
+    return b.publishedAt.getTime() - a.publishedAt.getTime();
+  });
+
+  const result = rows.slice(offset, offset + limit);
+
+  // Apply pagination
+  return result;
+}
+
+/**
+ * Get all unique topics from items
+ */
+export async function getAllTopics(): Promise<string[]> {
+  try {
+    const db = await getDb();
+    const results = await db
+      .select({ topic: itemTopics.topic })
+      .from(itemTopics)
+      .groupBy(itemTopics.topic)
+      .orderBy(itemTopics.topic);
+
+    return results.map(r => r.topic);
+  } catch (err) {
+    console.warn('Failed to get topics:', err);
+    return [];
+  }
+}
+
+/**
  * Hydrate PGlite from Electric and expose data via Svelte store.
  */
 export async function initializeItemsSync() {
+  if (isSyncing) return; // already syncing
   if (shapeSubscriptions['items']) return; // already started
 
+  isSyncing = true;
   stateStore.set({ loading: true, error: null });
 
   try {
@@ -219,6 +359,7 @@ export async function initializeItemsSync() {
             console.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
 
             await refreshItemsFromDb();
+            isSyncing = false;
             stateStore.set({ loading: false, error: null });
             return;
           }
@@ -238,6 +379,7 @@ export async function initializeItemsSync() {
 
       console.warn('[ItemsSync] Timeout waiting for data after 7.5 seconds');
       await refreshItemsFromDb();
+      isSyncing = false;
       stateStore.set({ loading: false, error: null });
     };
 
@@ -245,6 +387,7 @@ export async function initializeItemsSync() {
     setTimeout(pollForData, 1000);
   } catch (err) {
     console.error('initializeItemsSync failed', err);
+    isSyncing = false;
     stateStore.set({
       loading: false,
       error: (err as Error).message ?? String(err),
