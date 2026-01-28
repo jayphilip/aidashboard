@@ -53,8 +53,8 @@ services:
 
   ingestor:
     build:
-      context: ./server/ingestor
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: server/ingestor/Dockerfile
     container_name: aidashboard-ingestor
     environment:
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}

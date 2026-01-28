@@ -7,13 +7,13 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy package files
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
 # Copy source code
-COPY web/ ./
+COPY . ./
 
 # Build the SvelteKit app
 RUN pnpm run build
@@ -27,7 +27,7 @@ WORKDIR /app
 RUN npm install -g pnpm
 
 # Copy package files for runtime dependencies
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 
 # Install only production dependencies
 RUN pnpm install --frozen-lockfile --prod
