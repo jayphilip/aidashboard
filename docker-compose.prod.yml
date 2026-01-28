@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aidashboard-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-aidashboard}
+    ports:
+      - "127.0.0.1:5432:5432"  # Only accessible from localhost (via other containers)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "shared_preload_libraries=pglogical"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aidashboard
+    restart: unless-stopped
+
+  electric:
+    image: electricsql/electric:latest
+    container_name: aidashboard-electric
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}
+      ELECTRIC_WRITE_TO_PG_MODE: direct
+      LOGICAL_PUBLISHER: true
+      AUTH_MODE: insecure
+      ELECTRIC_INSECURE: true
+      # The public URL that the browser will use to connect
+      ELECTRIC_PUBLIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aidashboard
+    restart: unless-stopped
+
+  ingestor:
+    build:
+      context: ./server/ingestor
+      dockerfile: Dockerfile
+    container_name: aidashboard-ingestor
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}
+      RUST_LOG: ${RUST_LOG:-info}
+      INGESTION_INTERVAL_SECS: ${INGESTION_INTERVAL_SECS:-3600}
+      ARXIV_API_URL: ${ARXIV_API_URL:-http://export.arxiv.org/api/query}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aidashboard
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: aidashboard-web
+    environment:
+      PUBLIC_ELECTRIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
+      ELECTRIC_SECRET: ${ELECTRIC_SECRET:-changeme}
+    ports:
+      - "5173:3000"  # Expose web app on port 5173 (or configure via reverse proxy)
+    depends_on:
+      - electric
+    networks:
+      - aidashboard
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  aidashboard:
+    driver: bridge
