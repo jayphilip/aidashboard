@@ -20,8 +20,6 @@ services:
       - "max_wal_senders=10"
       - "-c"
       - "max_replication_slots=10"
-      - "-c"
-      - "shared_preload_libraries=pglogical"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
