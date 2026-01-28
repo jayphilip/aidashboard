@@ -33,7 +33,7 @@ services:
     image: electricsql/electric:latest
     container_name: aidashboard-electric
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}?sslmode=disable
       ELECTRIC_WRITE_TO_PG_MODE: direct
       LOGICAL_PUBLISHER: true
       AUTH_MODE: insecure
@@ -55,7 +55,7 @@ services:
       dockerfile: server/ingestor/Dockerfile
     container_name: aidashboard-ingestor
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}?sslmode=disable
       RUST_LOG: ${RUST_LOG:-info}
       INGESTION_INTERVAL_SECS: ${INGESTION_INTERVAL_SECS:-3600}
       ARXIV_API_URL: ${ARXIV_API_URL:-http://export.arxiv.org/api/query}
