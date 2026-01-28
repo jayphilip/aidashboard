@@ -42,6 +42,8 @@
   .filter-section {
     padding: 0.75rem 0;
     border-bottom: 1px solid rgb(71, 85, 105);
+    width: 100%;
+    max-width: 100%;
   }
 
   .filter-title {
@@ -57,16 +59,18 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    width: 100%;
   }
 
   .filter-option {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.375rem 0.5rem;
-    border-radius: 0.25rem;
+    gap: 0.75rem;
+    padding: 0.75rem 0.75rem;
+    border-radius: 0.375rem;
     cursor: pointer;
     transition: background-color 0.15s;
+    min-height: 44px;
   }
 
   .filter-option:hover {
@@ -77,6 +81,8 @@
     accent-color: rgb(59, 130, 246);
     cursor: pointer;
     flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
   }
 
   .option-label {

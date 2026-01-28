@@ -7,7 +7,7 @@
   import { paramsToFilters, filtersToParams } from '$lib/utils/urlParams';
   import type { Item, SearchOptions } from '$lib/stores/items';
   import ItemCard from '$lib/components/ItemCard.svelte';
-  import FilterPanel from '$lib/components/filters/FilterPanel.svelte';
+  import CollapsibleSidebar from '$lib/components/CollapsibleSidebar.svelte';
   import PaginationControls from '$lib/components/PaginationControls.svelte';
 
   // UI state (initialized for SSR)
@@ -126,7 +126,7 @@
 <div class="min-h-screen bg-slate-950 text-slate-50">
   <!-- Loading overlay: covers content but does not remove it from DOM -->
   {#if loading}
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 pointer-events-auto">
+    <div class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 pointer-events-auto">
       <div class="flex flex-col items-center">
         <svg class="animate-spin h-8 w-8 text-blue-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -138,19 +138,16 @@
   {/if}
 
   {#if !loading}
-    <div class="flex h-screen">
-      <!-- Left Sidebar: Filters -->
-      <aside class="w-80 bg-slate-900/50 border-r border-slate-700/50 overflow-y-scroll p-6">
-        <h1 class="text-2xl font-bold mb-6">Recent AI News</h1>
-        <FilterPanel
-          {filters}
-          onFiltersChange={handleFiltersChange}
-          showLikeStatusFilter={false}
-        />
-      </aside>
+    <div class="flex h-screen overflow-hidden">
+      <!-- Collapsible Sidebar: Filters -->
+      <CollapsibleSidebar
+        {filters}
+        onFiltersChange={handleFiltersChange}
+        showLikeStatusFilter={false}
+      />
 
       <!-- Main Content: Items Grid -->
-      <main class="flex-1 overflow-y-auto p-6">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-32 sm:pb-6">
         {#if error}
           <div class="bg-red-900/20 border border-red-800 rounded-lg p-4 mb-6 max-w-6xl">
             <p class="text-red-400">Error: {error}</p>

@@ -18,19 +18,19 @@
   }
 </script>
 
-<fieldset class="space-y-0">
+<fieldset class="space-y-0 w-full">
   <legend class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5 block">Content Type</legend>
-  <div class="space-y-1.5">
+  <div class="space-y-1 w-full">
     {#each sourceTypes as type}
-      <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-800/60 px-2.5 py-1.5 rounded-md transition-colors">
+      <label class="flex items-center gap-3 cursor-pointer hover:bg-slate-800/60 px-3 py-3 rounded-md transition-colors min-h-[44px]">
         <input
           type="checkbox"
           checked={selected.includes(type.value)}
           on:change={() => toggleType(type.value)}
           {disabled}
-          class="w-4 h-4 rounded"
+          class="w-5 h-5 rounded flex-shrink-0"
         />
-        <span class="text-sm text-slate-300">{type.label}</span>
+        <span class="text-sm text-slate-300 flex-1">{type.label}</span>
       </label>
     {/each}
   </div>

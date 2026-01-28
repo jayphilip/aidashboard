@@ -40,11 +40,18 @@
 <style>
   :global(.pagination-container) {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 1rem;
     margin-top: 2rem;
     margin-bottom: 2rem;
+  }
+
+  @media (min-width: 640px) {
+    :global(.pagination-container) {
+      flex-direction: row;
+    }
   }
 
   :global(.item-count) {
@@ -58,12 +65,16 @@
     background-color: rgb(59, 130, 246);
     color: white;
     border: none;
-    border-radius: 0.375rem;
-    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    min-height: 44px;
     cursor: pointer;
     font-size: 0.9375rem;
     font-weight: 500;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   :global(.btn-load-more:hover:not(:disabled)) {

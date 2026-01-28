@@ -83,7 +83,7 @@
   }
 </script>
 
-<fieldset class="space-y-0 pr-2">
+<fieldset class="space-y-0 w-full">
   <legend class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5 block">Date Range</legend>
 
   <!-- Preset buttons -->

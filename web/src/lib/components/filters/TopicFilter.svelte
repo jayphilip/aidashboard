@@ -37,7 +37,7 @@
   }
 </script>
 
-<fieldset class="space-y-0 min-w-0">
+<fieldset class="space-y-0 min-w-0 w-full">
   <legend class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5 block">Topics</legend>
 
   {#if loading}
@@ -45,7 +45,7 @@
   {/if}
 
   <!-- Search input -->
-  <div class="mb-3">
+  <div class="mb-3 w-full">
     <input
       type="text"
       placeholder="Search topics..."
@@ -58,17 +58,17 @@
   <!-- Topic list -->
   <div class="space-y-1 max-h-48 overflow-y-auto pr-1">
     {#each filteredTopics as topic}
-      <label class="flex items-center gap-2 cursor-pointer hover:bg-slate-800/60 px-2 py-1.5 rounded-md transition-colors">
+      <label class="flex items-center gap-3 cursor-pointer hover:bg-slate-800/60 px-3 py-2.5 rounded-md transition-colors min-h-[44px]">
         <input
           type="checkbox"
           checked={selected.includes(topic)}
           on:change={() => toggleTopic(topic)}
           {disabled}
-          class="w-4 h-4 rounded flex-shrink-0"
+          class="w-5 h-5 rounded flex-shrink-0"
         />
         <span class="text-sm text-slate-300 flex-1 truncate">{topic}</span>
         {#if selected.includes(topic)}
-          <span class="text-xs text-blue-400">✓</span>
+          <span class="text-xs text-blue-400 flex-shrink-0">✓</span>
         {/if}
       </label>
     {/each}

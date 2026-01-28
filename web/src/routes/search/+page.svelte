@@ -6,7 +6,7 @@
   import { paramsToFilters, filtersToParams } from '$lib/utils/urlParams';
   import type { SearchOptions } from '$lib/stores/items';
   import type { Item } from '$lib/stores/items';
-  import FilterPanel from '$lib/components/filters/FilterPanel.svelte';
+  import CollapsibleSidebar from '$lib/components/CollapsibleSidebar.svelte';
   import ItemCard from '$lib/components/ItemCard.svelte';
   import PaginationControls from '$lib/components/PaginationControls.svelte';
 
@@ -103,11 +103,11 @@
   });
 </script>
 
-<div class="min-h-screen bg-slate-950 text-slate-50 p-6">
-  <div class="max-w-6xl mx-auto">
-    <!-- Header -->
-    <div class="mb-8">
-      <h1 class="text-4xl font-bold mb-2">Search Results</h1>
+<div class="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+  <!-- Header -->
+  <div class="p-4 sm:p-6 border-b border-slate-700/50">
+    <div class="max-w-6xl mx-auto">
+      <h1 class="text-2xl sm:text-4xl font-bold mb-2">Search Results</h1>
       {#if filters.query}
         <p class="text-slate-400">
           {#if loading}
@@ -122,26 +122,29 @@
         <p class="text-slate-400">Enter a search query above</p>
       {/if}
     </div>
+  </div>
 
-    <!-- Error message -->
-    {#if error}
-      <div class="bg-red-900/20 border border-red-800 rounded-lg p-4 mb-6">
+  <!-- Error message -->
+  {#if error}
+    <div class="p-6 border-b border-slate-700/50">
+      <div class="max-w-6xl mx-auto bg-red-900/20 border border-red-800 rounded-lg p-4">
         <p class="text-red-400">Error: {error}</p>
       </div>
-    {/if}
+    </div>
+  {/if}
 
-    <!-- Main content area with sidebar -->
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <!-- Sidebar filters -->
-      <div class="lg:col-span-1">
-        <FilterPanel
-          {filters}
-          onFiltersChange={handleFiltersChange}
-        />
-      </div>
+  <!-- Main content area with sidebar -->
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Collapsible Sidebar: Filters -->
+    <CollapsibleSidebar
+      {filters}
+      onFiltersChange={handleFiltersChange}
+      showLikeStatusFilter={true}
+    />
 
-      <!-- Results -->
-      <div class="lg:col-span-3">
+    <!-- Results -->
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-32 sm:pb-6">
+      <div class="max-w-6xl">
         {#if loading}
           <div class="flex items-center justify-center py-12">
             <p class="text-slate-400">Searching...</p>
@@ -180,7 +183,7 @@
           />
         {/if}
       </div>
-    </div>
+    </main>
   </div>
 </div>
 

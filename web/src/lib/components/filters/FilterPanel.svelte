@@ -18,6 +18,7 @@
   let isMounted = false;
   let updateTimeout: ReturnType<typeof setTimeout> | undefined;
   let filterDeps = '';
+  let currentFilters: SearchOptions = {};
 
 
   onMount(() => {
@@ -125,23 +126,35 @@
   function handleLikeStatusChange() {
     // The reactive statement will handle the update via filterDeps
   }
+
+  // Reactive computed object for current filter state (for immediate display in ActiveFilters)
+  // Important: We create fresh arrays to ensure proper reactivity
+  $: {
+    currentFilters = {
+      ...(filters.query && { query: filters.query }),
+      ...(sourceTypes.length > 0 && { sourceTypes: [...sourceTypes] }),
+      ...((startDate || endDate) && { dateRange: { start: startDate, end: endDate } }),
+      ...(topics.length > 0 && { topics: [...topics] }),
+      ...(likeStatus && { likeStatus }),
+    };
+  }
 </script>
 
-<div class="space-y-4 overflow-hidden">
+<div class="space-y-4 overflow-x-hidden w-full">
   <!-- Header -->
   <h3 class="font-semibold text-slate-100 text-sm uppercase tracking-wide">Filters</h3>
 
   <!-- Active filters display -->
-  <div>
+  <div class="w-full">
     <ActiveFilters
-      {filters}
+      filters={currentFilters}
       onRemoveFilter={handleRemoveFilter}
       onClearAll={handleClearAll}
     />
   </div>
 
   <!-- Vertical filter controls for sidebar -->
-  <div class="space-y-4">
+  <div class="space-y-4 pb-6">
     <!-- Content Type -->
     <SourceTypeFilter bind:selected={sourceTypes} />
 

@@ -112,12 +112,12 @@
   });
 </script>
 
-<div class="min-h-screen bg-slate-950 text-slate-50 p-6">
+<div class="min-h-screen bg-slate-950 text-slate-50 p-4 sm:p-6">
   <div class="max-w-6xl mx-auto">
-    <div class="flex justify-between items-center mb-8">
-      <h1 class="text-4xl font-bold">Sources</h1>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 sm:mb-8">
+      <h1 class="text-2xl sm:text-4xl font-bold">Sources</h1>
       <button
-        class="btn-primary px-4 py-2"
+        class="btn-primary px-4 py-2 w-full sm:w-auto"
         on:click={() => (showNewForm = !showNewForm)}
       >
         {showNewForm ? '✕ Cancel' : '+ Add Source'}
@@ -149,7 +149,89 @@
     {/if}
 
     {#if !loading}
-      <div class="overflow-x-auto">
+      <!-- Mobile: Card layout -->
+      <div class="block md:hidden space-y-4">
+        {#each $sources$ as source (source.id)}
+          <div class="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+            <div class="p-4 space-y-3">
+              <!-- Header -->
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                  <span class="text-2xl flex-shrink-0">{getMediumIcon(source.medium)}</span>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="font-semibold text-base truncate">{source.name}</h3>
+                    <div class="flex items-center gap-2 text-sm text-slate-400">
+                      <span>{getTypeIcon(source.type)}</span>
+                      <span>{source.type}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  class="px-3 py-1.5 rounded text-sm flex-shrink-0 min-h-[36px] {source.active ? 'bg-emerald-600/30 text-emerald-300' : 'bg-slate-700/30 text-slate-400'}"
+                  on:click={() => handleToggleActive(source.id, source.active)}
+                >
+                  {source.active ? '✓ Active' : '○ Inactive'}
+                </button>
+              </div>
+
+              <!-- Details -->
+              <div class="space-y-2 text-sm">
+                <div>
+                  <span class="text-slate-500">Medium:</span>
+                  <span class="text-slate-300 ml-2">{source.medium}</span>
+                </div>
+                {#if source.frequency}
+                  <div>
+                    <span class="text-slate-500">Frequency:</span>
+                    <span class="text-slate-300 ml-2">{source.frequency}</span>
+                  </div>
+                {/if}
+                {#if source.ingestUrl}
+                  <div class="break-all">
+                    <span class="text-slate-500 block mb-1">URL:</span>
+                    <code class="text-xs bg-slate-950 px-2 py-1 rounded text-slate-300 break-all">
+                      {source.ingestUrl}
+                    </code>
+                  </div>
+                {/if}
+              </div>
+
+              <!-- Actions -->
+              <div class="pt-2 border-t border-slate-800">
+                <button
+                  class="btn text-sm px-4 py-2 w-full min-h-[44px]"
+                  on:click={() => (editingId = editingId === source.id ? null : source.id)}
+                >
+                  {editingId === source.id ? '✕ Cancel Edit' : '✎ Edit Source'}
+                </button>
+              </div>
+            </div>
+
+            <!-- Edit form -->
+            {#if editingId === source.id}
+              <div class="border-t border-slate-800 p-4 bg-slate-900/50">
+                <h4 class="font-semibold mb-4 text-sm">Edit Source</h4>
+                <SourceForm
+                  {source}
+                  sourceTypes={sourceTypes}
+                  mediumTypes={mediumTypes}
+                  on:save={e => handleSaveEdit(source.id, e)}
+                  on:cancel={() => (editingId = null)}
+                />
+              </div>
+            {/if}
+          </div>
+        {/each}
+
+        {#if $sources$.length === 0}
+          <div class="bg-slate-900 rounded-lg p-8 text-center">
+            <p class="text-slate-400">No sources configured yet</p>
+          </div>
+        {/if}
+      </div>
+
+      <!-- Desktop: Table layout -->
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full">
           <thead>
             <tr class="border-b border-slate-700">
@@ -226,13 +308,13 @@
             {/each}
           </tbody>
         </table>
-      </div>
 
-      {#if $sources$.length === 0}
-        <div class="bg-slate-900 rounded-lg p-8 text-center">
-          <p class="text-slate-400">No sources configured yet</p>
-        </div>
-      {/if}
+        {#if $sources$.length === 0}
+          <div class="bg-slate-900 rounded-lg p-8 text-center">
+            <p class="text-slate-400">No sources configured yet</p>
+          </div>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>

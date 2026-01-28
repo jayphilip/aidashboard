@@ -60,27 +60,30 @@
     return chips;
   }
 
-  $: chips = renderFilterChips();
+  $: chips = (filters, renderFilterChips());
   $: isActive = hasActiveFilters(filters);
 </script>
 
 {#if isActive}
-  <div class="flex flex-wrap gap-2 items-center w-full overflow-hidden">
-    {#each chips as chip}
-      <div class="bg-blue-500/15 border border-blue-500/30 rounded-full px-3 py-1.5 flex items-center gap-2 hover:bg-blue-500/20 transition-colors">
-        <span class="text-xs font-medium text-slate-100">{chip.label}</span>
-        <button
-          class="text-slate-400 hover:text-slate-200 transition ml-0.5"
-          on:click={() => onRemoveFilter(chip.type, chip.value)}
-          title="Remove filter"
-        >
-          ✕
-        </button>
-      </div>
-    {/each}
+  <div class="flex flex-col gap-2 w-full">
+    <div class="flex flex-wrap gap-2 items-center">
+      {#each chips as chip}
+        <div class="bg-blue-500/15 border border-blue-500/30 rounded-full px-3 py-2 flex items-center gap-2 hover:bg-blue-500/20 transition-colors max-w-full">
+          <span class="text-xs font-medium text-slate-100 truncate">{chip.label}</span>
+          <button
+            class="text-slate-400 hover:text-slate-200 transition ml-1 w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-700/50 flex-shrink-0"
+            on:click={() => onRemoveFilter(chip.type, chip.value)}
+            title="Remove filter"
+            aria-label="Remove {chip.label} filter"
+          >
+            ✕
+          </button>
+        </div>
+      {/each}
+    </div>
 
     <button
-      class="text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 px-2 py-1 rounded transition"
+      class="text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 px-3 py-2 rounded transition min-h-[36px] self-start"
       on:click={onClearAll}
       title="Clear all filters"
     >
