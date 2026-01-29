@@ -17,6 +17,7 @@
   let likeStatus: 'liked' | 'disliked' | 'unrated' | null = filters.likeStatus || null;
   let isMounted = false;
   let updateTimeout: ReturnType<typeof setTimeout> | undefined;
+  let currentFilters: SearchOptions = {};
 
 
   onMount(() => {
