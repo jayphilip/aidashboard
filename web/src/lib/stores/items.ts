@@ -343,6 +343,11 @@ export async function initializeItemsSync() {
     sevenDaysAgo.setUTCHours(0, 0, 0, 0);
     const cutoffIso = sevenDaysAgo.toISOString();
 
+    const itemTopicsTimeout = setTimeout(() => {
+      console.warn('[ItemsSync] Item topics sync timeout (10s), marking as complete');
+      tryCompletingSync();
+    }, 10000);
+
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
@@ -399,9 +404,14 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'item_topics',
         onError: (error: unknown) => {
+          clearTimeout(itemTopicsTimeout);
           console.error('[ItemsSync] item_topics shape sync error:', error);
+          // Treat errors as completed to avoid blocking
+          console.log('[ItemsSync] Item topics errored, marking as complete');
+          tryCompletingSync();
         },
         onInitialSync: () => {
+          clearTimeout(itemTopicsTimeout);
           console.log('[ItemsSync] Item topics initial sync complete');
           tryCompletingSync();
         },
