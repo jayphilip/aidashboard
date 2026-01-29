@@ -57,7 +57,7 @@ export function getDb() {
 
         CREATE TABLE IF NOT EXISTS items (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          source_id INTEGER NOT NULL REFERENCES sources(id),
+          source_id INTEGER NOT NULL,
           source_type TEXT NOT NULL CHECK (source_type IN ('paper', 'newsletter', 'blog', 'tweet')),
           title TEXT NOT NULL,
           url TEXT NOT NULL,
@@ -71,7 +71,7 @@ export function getDb() {
 
         CREATE TABLE IF NOT EXISTS item_topics (
           id SERIAL PRIMARY KEY,
-          item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL,
           topic TEXT NOT NULL,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
@@ -79,7 +79,7 @@ export function getDb() {
         CREATE TABLE IF NOT EXISTS item_likes (
           id SERIAL PRIMARY KEY,
           user_id TEXT NOT NULL,
-          item_id UUID NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+          item_id UUID NOT NULL,
           score INTEGER CHECK (score IN (-1, 0, 1)),
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           UNIQUE(user_id, item_id)
