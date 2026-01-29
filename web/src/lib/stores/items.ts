@@ -25,6 +25,8 @@ export const itemsState: Readable<ItemsState> = { subscribe: stateStore.subscrib
 
 let shapeSubscriptions: { [key: string]: { unsubscribe: () => void } } = {};
 let isSyncing = false;
+let syncCompleted = false;
+let syncCompletionCallbacks: (() => void)[] = [];
 
 async function refreshItemsFromDb() {
   try {
@@ -40,6 +42,44 @@ async function refreshItemsFromDb() {
     logger.warn('Failed to refresh items from db:', err);
     itemsStore.set([]);
   }
+}
+
+/**
+ * Helper to check if all shapes have completed initial sync
+ * and notify waiting callers
+ */
+let shapesSyncedCount = 0;
+const totalShapesToSync = 4; // items, sources, item_topics, item_likes
+
+function tryCompletingSync() {
+  shapesSyncedCount++;
+  logger.log(`[ItemsSync] Shape sync progress: ${shapesSyncedCount}/${totalShapesToSync}`);
+
+  if (shapesSyncedCount === totalShapesToSync) {
+    logger.log('[ItemsSync] All shapes synced, completing initialization');
+    syncCompleted = true;
+    refreshItemsFromDb();
+    isSyncing = false;
+    stateStore.set({ loading: false, error: null });
+
+    // Call any waiting callbacks
+    syncCompletionCallbacks.forEach(cb => cb());
+    syncCompletionCallbacks = [];
+  }
+}
+
+/**
+ * Wait for initial sync to complete
+ * Returns immediately if already synced, otherwise returns a promise
+ */
+export function waitForSyncCompletion(): Promise<void> {
+  if (syncCompleted) {
+    return Promise.resolve();
+  }
+
+  return new Promise(resolve => {
+    syncCompletionCallbacks.push(resolve);
+  });
 }
 
 /**
@@ -295,12 +335,17 @@ export async function initializeItemsSync() {
 
     logger.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
 
+    // Calculate 7-day cutoff for shape filtering
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const cutoffIso = sevenDaysAgo.toISOString();
+
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
           url: proxyUrl,
           params: {
             table: 'items',
+            where: `published_at >= '${cutoffIso}'`,
           },
         },
         table: 'items',
@@ -318,6 +363,7 @@ export async function initializeItemsSync() {
         },
         onInitialSync: () => {
           logger.log('[ItemsSync] Items initial sync complete');
+          tryCompletingSync();
         },
       }),
       (pg as any).electric.syncShapeToTable({
@@ -335,6 +381,7 @@ export async function initializeItemsSync() {
         },
         onInitialSync: () => {
           logger.log('[ItemsSync] Sources initial sync complete');
+          tryCompletingSync();
         },
       }),
       (pg as any).electric.syncShapeToTable({
@@ -352,6 +399,7 @@ export async function initializeItemsSync() {
         },
         onInitialSync: () => {
           logger.log('[ItemsSync] Item topics initial sync complete');
+          tryCompletingSync();
         },
       }),
       (pg as any).electric.syncShapeToTable({
@@ -369,6 +417,7 @@ export async function initializeItemsSync() {
         },
         onInitialSync: () => {
           logger.log('[ItemsSync] Item likes initial sync complete');
+          tryCompletingSync();
         },
       }),
     ]);
@@ -379,54 +428,6 @@ export async function initializeItemsSync() {
     shapeSubscriptions['item_likes'] = shapes[3];
 
     logger.log('[ItemsSync] Shapes subscribed successfully');
-
-    // Poll for data to arrive from Electric sync
-    const pollForData = async () => {
-      let attempts = 0;
-      const maxAttempts = 15; // 15 attempts * 500ms = 7.5 seconds
-
-      while (attempts < maxAttempts) {
-        try {
-          const countResult = await pg.query<{ count: number }>(
-            'SELECT COUNT(*)::int AS count FROM items;'
-          );
-          const count = countResult.rows[0]?.count ?? 0;
-          logger.log('[ItemsSync] PGlite items count:', count, `(attempt ${attempts + 1}/${maxAttempts})`);
-
-          if (count > 0) {
-            // Debug: Check published_at dates
-            const dateCheckResult = await pg.query(
-              'SELECT MIN(published_at) as oldest, MAX(published_at) as newest, COUNT(*) as total FROM items;'
-            );
-            logger.log('[ItemsSync] Date range:', dateCheckResult.rows[0]);
-
-            await refreshItemsFromDb();
-            isSyncing = false;
-            stateStore.set({ loading: false, error: null });
-            return;
-          }
-
-          attempts++;
-          if (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        } catch (err) {
-          logger.warn('[ItemsSync] Error querying items (attempt', attempts + 1, '):', err);
-          attempts++;
-          if (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        }
-      }
-
-      logger.warn('[ItemsSync] Timeout waiting for data after 7.5 seconds');
-      await refreshItemsFromDb();
-      isSyncing = false;
-      stateStore.set({ loading: false, error: null });
-    };
-
-    // Start polling after initial sync has time to begin
-    setTimeout(pollForData, 1000);
   } catch (err) {
     logger.error('initializeItemsSync failed', err);
     isSyncing = false;
@@ -440,4 +441,7 @@ export async function initializeItemsSync() {
 export function cleanupItemsSync() {
   Object.values(shapeSubscriptions).forEach(sub => sub?.unsubscribe());
   shapeSubscriptions = {};
+  shapesSyncedCount = 0;
+  syncCompleted = false;
+  syncCompletionCallbacks = [];
 }

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { initializeItemsSync, cleanupItemsSync, getRecentItems, searchItems, itemsState } from '$lib/stores/items';
+  import { initializeItemsSync, cleanupItemsSync, getRecentItems, searchItems, itemsState, waitForSyncCompletion } from '$lib/stores/items';
   import { rankItems } from '$lib/scoring';
   import { paramsToFilters, filtersToParams } from '$lib/utils/urlParams';
   import type { Item, SearchOptions } from '$lib/stores/items';
@@ -102,7 +102,7 @@
     (async () => {
       try {
         await initializeItemsSync();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await waitForSyncCompletion();
 
         // Initialize filters and page from URL params
         filters = paramsToFilters($page.url.searchParams);
