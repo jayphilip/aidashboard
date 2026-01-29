@@ -1,0 +1,62 @@
+name: Deploy to Hetzner VPS
+
+on:
+  push:
+    branches:
+      - main
+    # Trigger on any meaningful changes (removed path filters for reliability)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e  # Exit on error
+
+            echo "🚀 Starting deployment..."
+
+            # Navigate to project directory
+            cd ~/aidashboard || { echo "❌ Project directory not found"; exit 1; }
+
+            # Pull latest changes
+            echo "📥 Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Rebuild and restart web service
+            echo "🔨 Building and restarting web service..."
+            docker-compose -f docker-compose.prod.yml up -d --build web
+
+            # Wait for service to be ready
+            echo "⏳ Waiting for service to start..."
+            sleep 5
+
+            # Check if container is running
+            if docker-compose -f docker-compose.prod.yml ps web | grep -q "Up"; then
+              echo "✅ Deployment successful!"
+            else
+              echo "❌ Deployment failed - web service not running"
+              docker-compose -f docker-compose.prod.yml logs --tail=50 web
+              exit 1
+            fi
+
+            # Clean up old images
+            echo "🧹 Cleaning up old images..."
+            docker image prune -af --filter "until=24h"
+
+            echo "🎉 Deployment complete!"
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "❌ Deployment failed! Check the logs above."
