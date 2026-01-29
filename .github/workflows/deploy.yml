@@ -43,21 +43,23 @@ jobs:
             echo "🛑 Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down || true
 
-            # Rebuild and restart web service
-            echo "🔨 Building and restarting web service..."
-            docker-compose -f docker-compose.prod.yml up -d --build web
+            # Rebuild and restart all services
+            echo "🔨 Building and restarting all services..."
+            docker-compose -f docker-compose.prod.yml up -d --build
 
-            # Wait for service to be ready
-            echo "⏳ Waiting for service to start..."
-            sleep 5
+            # Wait for services to be ready
+            echo "⏳ Waiting for services to start..."
+            sleep 10
 
-            # Check if container is running
-            if docker-compose -f docker-compose.prod.yml ps web | grep -q "Up"; then
-              echo "✅ Deployment successful!"
-            else
-              echo "❌ Deployment failed - web service not running"
-              docker-compose -f docker-compose.prod.yml logs --tail=50 web
+            # Check if all critical containers are running
+            if docker-compose -f docker-compose.prod.yml ps | grep -E "(postgres|electric|web)" | grep -v "Up" > /dev/null; then
+              echo "❌ Deployment failed - some services not running"
+              docker-compose -f docker-compose.prod.yml ps
+              docker-compose -f docker-compose.prod.yml logs --tail=50
               exit 1
+            else
+              echo "✅ Deployment successful!"
+              docker-compose -f docker-compose.prod.yml ps
             fi
 
             # Clean up old images
