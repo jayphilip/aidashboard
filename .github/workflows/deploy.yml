@@ -21,7 +21,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          fingerprint: SHA256:5yiVqcLftRwW7JyDJYgqup1z5EgnHGI4AiO1QX4X7Ng
+          fingerprint: 5yiVqcLftRwW7JyDJYgqup1z5EgnHGI4AiO1QX4X7Ng
           script: |
             set -e  # Exit on error
 
