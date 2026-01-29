@@ -53,6 +53,19 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool> {
         }
     }
 
+    // Ensure foreign key constraints are dropped for local-first sync compatibility
+    log::info!("Checking and removing foreign key constraints if present...");
+    let _ = sqlx::query("ALTER TABLE item_topics DROP CONSTRAINT IF EXISTS item_topics_item_id_fkey")
+        .execute(&pool)
+        .await;
+    let _ = sqlx::query("ALTER TABLE item_likes DROP CONSTRAINT IF EXISTS item_likes_item_id_fkey")
+        .execute(&pool)
+        .await;
+    let _ = sqlx::query("ALTER TABLE items DROP CONSTRAINT IF EXISTS items_source_id_fkey")
+        .execute(&pool)
+        .await;
+    log::info!("Foreign key constraint cleanup completed");
+
     Ok(pool)
 }
 
