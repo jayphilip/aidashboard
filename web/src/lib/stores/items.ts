@@ -336,7 +336,9 @@ export async function initializeItemsSync() {
     logger.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
 
     // Calculate 7-day cutoff for shape filtering
+    // Round to start of day (midnight UTC) for consistency across page loads
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    sevenDaysAgo.setUTCHours(0, 0, 0, 0);
     const cutoffIso = sevenDaysAgo.toISOString();
 
     const shapes = await Promise.all([
