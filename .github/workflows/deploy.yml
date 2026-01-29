@@ -33,7 +33,7 @@ jobs:
             echo "🚀 Starting deployment..."
 
             # Navigate to project directory
-            cd ~/aidashboard || { echo "❌ Project directory not found"; exit 1; }
+            cd ~/root/aidashboard || { echo "❌ Project directory not found"; exit 1; }
 
             # Pull latest changes
             echo "📥 Pulling latest code..."
