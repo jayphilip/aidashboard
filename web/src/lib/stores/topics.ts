@@ -31,54 +31,41 @@ export const topicsState: Readable<TopicsState> = { subscribe: stateStore.subscr
 export async function getTrendingTopics(weeksBack: number = 4): Promise<TopicTrend[]> {
   try {
     const db = await getDb();
-
-    // Calculate cutoff date in JavaScript
     const cutoff = new Date(Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000);
 
-    // Get all topics with their items
-    const topicCounts = await db
-      .select({
-        topic: itemTopics.topic,
-        itemId: itemTopics.itemId,
-        publishedAt: items.publishedAt,
-      })
-      .from(itemTopics)
-      .innerJoin(items, sql`${itemTopics.itemId} = ${items.id}`)
-      .where(gte(items.publishedAt, cutoff));
+    // Use SQL to aggregate by topic and week - much faster than client-side
+    const weeklyResults = await db.execute<{
+      topic: string;
+      week: string;
+      count: number;
+    }>(sql`
+      SELECT
+        it.topic,
+        to_char(date_trunc('week', i.published_at), 'YYYY-"W"IW') as week,
+        COUNT(*) as count
+      FROM item_topics it
+      INNER JOIN items i ON it.item_id = i.id
+      WHERE i.published_at >= ${cutoff}
+      GROUP BY it.topic, date_trunc('week', i.published_at)
+      ORDER BY it.topic, week
+    `);
 
-    // Group by topic and calculate weekly aggregates
+    // Group by topic
     const topicMap = new Map<string, TopicTrend>();
 
-    topicCounts.forEach(row => {
-      const topic = row.topic;
-      if (!topicMap.has(topic)) {
-        topicMap.set(topic, {
-          topic,
+    weeklyResults.rows.forEach(row => {
+      if (!topicMap.has(row.topic)) {
+        topicMap.set(row.topic, {
+          topic: row.topic,
           weeklyData: [],
           totalItems: 0,
           totalLiked: 0,
         });
       }
 
-      const trend = topicMap.get(topic)!;
-      trend.totalItems++;
-
-      // Calculate week
-      const date = new Date(row.publishedAt as any);
-      const week = getWeekString(date);
-
-      // Find or create weekly entry
-      let weekEntry = trend.weeklyData.find(w => w.week === week);
-      if (!weekEntry) {
-        weekEntry = { week, count: 0 };
-        trend.weeklyData.push(weekEntry);
-      }
-      weekEntry.count++;
-    });
-
-    // Sort weeks chronologically
-    topicMap.forEach(trend => {
-      trend.weeklyData.sort((a, b) => a.week.localeCompare(b.week));
+      const trend = topicMap.get(row.topic)!;
+      trend.weeklyData.push({ week: row.week, count: Number(row.count) });
+      trend.totalItems += Number(row.count);
     });
 
     return Array.from(topicMap.values()).sort(
@@ -99,49 +86,42 @@ export async function getTopicsBySourceType(
 ): Promise<TopicTrend[]> {
   try {
     const db = await getDb();
-
-    // Calculate cutoff date in JavaScript
     const cutoff = new Date(Date.now() - weeksBack * 7 * 24 * 60 * 60 * 1000);
 
-    const topicCounts = await db
-      .select({
-        topic: itemTopics.topic,
-        itemId: itemTopics.itemId,
-        publishedAt: items.publishedAt,
-      })
-      .from(itemTopics)
-      .innerJoin(items, sql`${itemTopics.itemId} = ${items.id}`)
-      .where(and(gte(items.publishedAt, cutoff), eq(items.sourceType, sourceType)));
+    // Use SQL aggregation for better performance
+    const weeklyResults = await db.execute<{
+      topic: string;
+      week: string;
+      count: number;
+    }>(sql`
+      SELECT
+        it.topic,
+        to_char(date_trunc('week', i.published_at), 'YYYY-"W"IW') as week,
+        COUNT(*) as count
+      FROM item_topics it
+      INNER JOIN items i ON it.item_id = i.id
+      WHERE i.published_at >= ${cutoff}
+        AND i.source_type = ${sourceType}
+      GROUP BY it.topic, date_trunc('week', i.published_at)
+      ORDER BY it.topic, week
+    `);
 
+    // Group by topic
     const topicMap = new Map<string, TopicTrend>();
 
-    topicCounts.forEach(row => {
-      const topic = row.topic;
-      if (!topicMap.has(topic)) {
-        topicMap.set(topic, {
-          topic,
+    weeklyResults.rows.forEach(row => {
+      if (!topicMap.has(row.topic)) {
+        topicMap.set(row.topic, {
+          topic: row.topic,
           weeklyData: [],
           totalItems: 0,
           totalLiked: 0,
         });
       }
 
-      const trend = topicMap.get(topic)!;
-      trend.totalItems++;
-
-      const date = new Date(row.publishedAt as any);
-      const week = getWeekString(date);
-
-      let weekEntry = trend.weeklyData.find(w => w.week === week);
-      if (!weekEntry) {
-        weekEntry = { week, count: 0 };
-        trend.weeklyData.push(weekEntry);
-      }
-      weekEntry.count++;
-    });
-
-    topicMap.forEach(trend => {
-      trend.weeklyData.sort((a, b) => a.week.localeCompare(b.week));
+      const trend = topicMap.get(row.topic)!;
+      trend.weeklyData.push({ week: row.week, count: Number(row.count) });
+      trend.totalItems += Number(row.count);
     });
 
     return Array.from(topicMap.values()).sort(

@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import type { Item } from '$lib/stores/items';
   import { userId } from '$lib/stores/user';
+  import { getSourceNameById } from '$lib/stores/sources';
   import { getDb } from '$lib/db';
-  import { itemLikes, sources } from '$lib/schema';
+  import { itemLikes } from '$lib/schema';
   import { eq, and } from 'drizzle-orm';
   import { logger } from '$lib/utils/logger';
 
@@ -13,13 +14,17 @@
   let sourceName = 'Unknown';
   let loading = false;
   let currentUserId: string = '';
+  let unsubscribeUserId: (() => void) | null = null;
 
   onMount(async () => {
     try {
-      // Subscribe to user ID
-      userId.subscribe(id => {
+      // Subscribe to user ID and store unsubscribe function
+      unsubscribeUserId = userId.subscribe(id => {
         currentUserId = id;
-      })();
+      });
+
+      // Get source name from cache
+      sourceName = await getSourceNameById(item.sourceId);
 
       const db = await getDb();
       // Get the user like status
@@ -35,19 +40,15 @@
       if (result.length > 0) {
         liked = result[0].score;
       }
-
-      // Get source name
-      const sourceResult = await db
-        .select()
-        .from(sources)
-        .where(eq(sources.id, item.sourceId))
-        .limit(1);
-
-      if (sourceResult.length > 0) {
-        sourceName = sourceResult[0].name;
-      }
     } catch (err) {
-      logger.error('Failed to load like status:', err);
+      logger.error('Failed to load card data:', err);
+    }
+  });
+
+  onDestroy(() => {
+    // Clean up subscription
+    if (unsubscribeUserId) {
+      unsubscribeUserId();
     }
   });
 

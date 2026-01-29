@@ -8,6 +8,8 @@
   let allTopics: string[] = [];
   let loading = false;
   let searchQuery = '';
+  let debouncedSearchQuery = '';
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   onMount(async () => {
     loading = true;
@@ -20,8 +22,17 @@
     }
   });
 
+  // Debounce search input
+  $: {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debouncedSearchQuery = searchQuery;
+    }, 300);
+  }
+
+  // Filter based on debounced query
   $: filteredTopics = allTopics.filter(topic =>
-    topic.toLowerCase().includes(searchQuery.toLowerCase())
+    topic.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   );
 
   function toggleTopic(topic: string) {

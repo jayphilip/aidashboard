@@ -96,6 +96,12 @@ export function getDb() {
         CREATE INDEX IF NOT EXISTS idx_item_topics_topic ON item_topics(topic);
         CREATE INDEX IF NOT EXISTS idx_item_likes_user_id ON item_likes(user_id);
         CREATE INDEX IF NOT EXISTS idx_item_likes_item_id ON item_likes(item_id);
+
+        -- Compound indexes for common query patterns
+        CREATE INDEX IF NOT EXISTS idx_items_source_type_published ON items(source_type, published_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_items_source_id_published ON items(source_id, published_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_item_topics_item_topic ON item_topics(item_id, topic);
+        CREATE INDEX IF NOT EXISTS idx_item_likes_user_item ON item_likes(user_id, item_id);
       `);
 
       return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes } });

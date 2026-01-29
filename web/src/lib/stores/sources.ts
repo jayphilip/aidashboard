@@ -158,3 +158,23 @@ export async function initializeSourcesFromDb() {
     });
   }
 }
+
+/**
+ * Get source name by ID from the store (cached)
+ * Returns a promise that resolves with the source name or 'Unknown' if not found
+ */
+let sourcesCache: Map<number, string> | null = null;
+
+export async function getSourceNameById(sourceId: number): Promise<string> {
+  // If cache doesn't exist, build it from the database
+  if (!sourcesCache) {
+    sourcesCache = new Map();
+    const db = await getDb();
+    const allSources = await db.select().from(sources);
+    allSources.forEach(source => {
+      sourcesCache!.set(source.id, source.name);
+    });
+  }
+
+  return sourcesCache.get(sourceId) || 'Unknown';
+}

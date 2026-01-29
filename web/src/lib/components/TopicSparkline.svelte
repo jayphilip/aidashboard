@@ -1,37 +1,22 @@
 <script lang="ts">
   export let data: Array<{ week: string; count: number }> = [];
 
-  function generateSparklinePoints(): string {
-    if (data.length === 0) return '';
+  // Memoized calculations - only recompute when data changes
+  $: barChart = generateBarChart(data);
+  $: peakValue = data.length > 0 ? Math.max(...data.map(d => d.count)) : 0;
+  $: avgValue = data.length > 0 ? Math.round(data.reduce((a, b) => a + b.count, 0) / data.length) : 0;
 
-    const maxCount = Math.max(...data.map(d => d.count), 1);
-    const width = 200;
-    const height = 60;
-    const padding = 4;
+  function generateBarChart(chartData: Array<{ week: string; count: number }>): string {
+    if (chartData.length === 0) return '';
 
-    const pointWidth = (width - 2 * padding) / Math.max(1, data.length - 1);
-    const scale = (height - 2 * padding) / maxCount;
-
-    const points = data.map((d, i) => {
-      const x = padding + i * pointWidth;
-      const y = height - padding - d.count * scale;
-      return `${x},${y}`;
-    });
-
-    return points.join(' ');
-  }
-
-  function generateBarChart(): string {
-    if (data.length === 0) return '';
-
-    const maxCount = Math.max(...data.map(d => d.count), 1);
+    const maxCount = Math.max(...chartData.map(d => d.count), 1);
     const bars: string[] = [];
     const barWidth = 12;
     const spacing = 4;
     const height = 40;
     const padding = 2;
 
-    data.forEach((d, i) => {
+    chartData.forEach((d, i) => {
       const x = padding + i * (barWidth + spacing);
       const barHeight = (d.count / maxCount) * height;
       const y = height + padding - barHeight;
@@ -45,11 +30,11 @@
 
 <div class="flex items-center gap-2">
   <svg width="120" height="50" class="flex-shrink-0">
-    {generateBarChart()}
+    {@html barChart}
   </svg>
   <div class="text-xs text-slate-400">
-    <div>Peak: {Math.max(...data.map(d => d.count), 0)}</div>
-    <div>Avg: {data.length > 0 ? Math.round(data.reduce((a, b) => a + b.count, 0) / data.length) : 0}</div>
+    <div>Peak: {peakValue}</div>
+    <div>Avg: {avgValue}</div>
   </div>
 </div>
 

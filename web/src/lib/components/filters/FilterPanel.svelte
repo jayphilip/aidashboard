@@ -17,8 +17,6 @@
   let likeStatus: 'liked' | 'disliked' | 'unrated' | null = filters.likeStatus || null;
   let isMounted = false;
   let updateTimeout: ReturnType<typeof setTimeout> | undefined;
-  let filterDeps = '';
-  let currentFilters: SearchOptions = {};
 
 
   onMount(() => {
@@ -31,17 +29,12 @@
     likeStatus = filters.likeStatus || null;
   });
 
-  // Debounced reactive statement - only update after changes settle for 300ms
-  // This prevents excessive reload calls when user interacts with filters
-  $: filterDeps = JSON.stringify({
-    sourceTypes,
-    startDate: startDate?.toISOString(),
-    endDate: endDate?.toISOString(),
-    topics,
-    likeStatus,
-  });
+  // Debounced reactive statement - triggers on any filter change
+  // Avoids expensive JSON.stringify by reacting to actual values
+  $: if (isMounted) {
+    // React to these dependencies
+    sourceTypes, startDate, endDate, topics, likeStatus;
 
-  $: if (isMounted && filterDeps) {
     clearTimeout(updateTimeout);
     updateTimeout = setTimeout(() => {
       updateFilters();

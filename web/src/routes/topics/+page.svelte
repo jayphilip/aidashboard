@@ -14,6 +14,7 @@
   let minItems = 1;
   let loading = true;
   let error: string | null = null;
+  let filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function loadTopics() {
     try {
@@ -75,11 +76,17 @@
   }
 
   function handleSearchChange() {
-    applyFiltersAndSort();
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => {
+      applyFiltersAndSort();
+    }, 300);
   }
 
   function handleMinItemsChange() {
-    applyFiltersAndSort();
+    if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => {
+      applyFiltersAndSort();
+    }, 300);
   }
 
   function handleSortChange() {
