@@ -35,9 +35,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}?sslmode=disable
       ELECTRIC_WRITE_TO_PG_MODE: direct
-      LOGICAL_PUBLISHER: true
+      LOGICAL_PUBLISHER: "true"
       AUTH_MODE: insecure
-      ELECTRIC_INSECURE: true
+      ELECTRIC_INSECURE: "true"
       # The public URL that the browser will use to connect
       ELECTRIC_PUBLIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
     ports:
