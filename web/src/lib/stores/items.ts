@@ -53,10 +53,10 @@ const totalShapesToSync = 4; // items, sources, item_topics, item_likes
 
 function tryCompletingSync() {
   shapesSyncedCount++;
-  logger.log(`[ItemsSync] Shape sync progress: ${shapesSyncedCount}/${totalShapesToSync}`);
+  console.log(`[ItemsSync] Shape sync progress: ${shapesSyncedCount}/${totalShapesToSync}`);
 
   if (shapesSyncedCount === totalShapesToSync) {
-    logger.log('[ItemsSync] All shapes synced, completing initialization');
+    console.log('[ItemsSync] All shapes synced, completing initialization');
     syncCompleted = true;
     refreshItemsFromDb();
     isSyncing = false;
@@ -326,14 +326,16 @@ export async function initializeItemsSync() {
   stateStore.set({ loading: true, error: null });
 
   try {
+    console.log('[ItemsSync] Initializing sync...');
     const pg = await getPGlite();
+    console.log('[ItemsSync] PGlite initialized');
 
     // Use the SvelteKit proxy endpoint instead of connecting directly to Electric
     // This avoids CORS issues and keeps the secret server-side
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
     const proxyUrl = `${baseUrl}/api/electric/shape`;
 
-    logger.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
+    console.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
 
     // Calculate 7-day cutoff for shape filtering
     // Round to start of day (midnight UTC) for consistency across page loads
@@ -354,9 +356,9 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'items',
         onError: (error: unknown) => {
-          logger.error('[ItemsSync] items shape sync error:', error);
+          console.error('[ItemsSync] items shape sync error:', error);
           if (error instanceof Error) {
-            logger.error('[ItemsSync] Error stack:', error.stack);
+            console.error('[ItemsSync] Error stack:', error.stack);
           }
           stateStore.set({
             loading: false,
@@ -364,7 +366,7 @@ export async function initializeItemsSync() {
           });
         },
         onInitialSync: () => {
-          logger.log('[ItemsSync] Items initial sync complete');
+          console.log('[ItemsSync] Items initial sync complete');
           tryCompletingSync();
         },
       }),
@@ -379,10 +381,10 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'sources',
         onError: (error: unknown) => {
-          logger.error('[ItemsSync] sources shape sync error:', error);
+          console.error('[ItemsSync] sources shape sync error:', error);
         },
         onInitialSync: () => {
-          logger.log('[ItemsSync] Sources initial sync complete');
+          console.log('[ItemsSync] Sources initial sync complete');
           tryCompletingSync();
         },
       }),
@@ -397,10 +399,10 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'item_topics',
         onError: (error: unknown) => {
-          logger.error('[ItemsSync] item_topics shape sync error:', error);
+          console.error('[ItemsSync] item_topics shape sync error:', error);
         },
         onInitialSync: () => {
-          logger.log('[ItemsSync] Item topics initial sync complete');
+          console.log('[ItemsSync] Item topics initial sync complete');
           tryCompletingSync();
         },
       }),
@@ -415,10 +417,10 @@ export async function initializeItemsSync() {
         primaryKey: ['id'],
         shapeKey: 'item_likes',
         onError: (error: unknown) => {
-          logger.error('[ItemsSync] item_likes shape sync error:', error);
+          console.error('[ItemsSync] item_likes shape sync error:', error);
         },
         onInitialSync: () => {
-          logger.log('[ItemsSync] Item likes initial sync complete');
+          console.log('[ItemsSync] Item likes initial sync complete');
           tryCompletingSync();
         },
       }),
@@ -429,9 +431,9 @@ export async function initializeItemsSync() {
     shapeSubscriptions['item_topics'] = shapes[2];
     shapeSubscriptions['item_likes'] = shapes[3];
 
-    logger.log('[ItemsSync] Shapes subscribed successfully');
+    console.log('[ItemsSync] Shapes subscribed successfully');
   } catch (err) {
-    logger.error('initializeItemsSync failed', err);
+    console.error('[ItemsSync] initializeItemsSync failed:', err);
     isSyncing = false;
     stateStore.set({
       loading: false,
