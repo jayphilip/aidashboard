@@ -344,9 +344,9 @@ export async function initializeItemsSync() {
     const cutoffIso = sevenDaysAgo.toISOString();
 
     const itemTopicsTimeout = setTimeout(() => {
-      console.warn('[ItemsSync] Item topics sync timeout (10s), marking as complete');
+      console.warn('[ItemsSync] Item topics sync timeout (3s), marking as complete');
       tryCompletingSync();
-    }, 10000);
+    }, 3000);
 
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
