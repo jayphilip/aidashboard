@@ -33,12 +33,16 @@ jobs:
             echo "🚀 Starting deployment..."
 
             # Navigate to project directory
-            cd ~/root/aidashboard || { echo "❌ Project directory not found"; exit 1; }
+            cd ~/aidashboard || { echo "❌ Project directory not found"; exit 1; }
 
             # Pull latest changes
             echo "📥 Pulling latest code..."
             git fetch origin main
             git reset --hard origin/main
+
+            # Stop and remove all containers to avoid stale state
+            echo "🛑 Stopping existing containers..."
+            docker-compose -f docker-compose.prod.yml down || true
 
             # Rebuild and restart web service
             echo "🔨 Building and restarting web service..."
