@@ -326,16 +326,20 @@ export async function initializeItemsSync() {
   stateStore.set({ loading: true, error: null });
 
   try {
+    const t0 = performance.now();
     console.log('[ItemsSync] Initializing sync...');
+
+    const t1 = performance.now();
     const pg = await getPGlite();
-    console.log('[ItemsSync] PGlite initialized');
+    console.log(`[ItemsSync] PGlite initialized in ${(performance.now() - t1).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
     // Use the SvelteKit proxy endpoint instead of connecting directly to Electric
     // This avoids CORS issues and keeps the secret server-side
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
     const proxyUrl = `${baseUrl}/api/electric/shape`;
 
-    console.log('[ItemsSync] Starting sync with proxy:', proxyUrl);
+    const t2 = performance.now();
+    console.log(`[ItemsSync] Starting sync with proxy: ${proxyUrl} (elapsed: ${(t2 - t0).toFixed(0)}ms)`);
 
     // Calculate 7-day cutoff for shape filtering
     // Round to start of day (midnight UTC) for consistency across page loads
@@ -348,6 +352,8 @@ export async function initializeItemsSync() {
       tryCompletingSync();
     }, 3000);
 
+    const t3 = performance.now();
+    console.log(`[ItemsSync] Creating shape subscriptions (elapsed: ${(t3 - t0).toFixed(0)}ms)`);
     const shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
@@ -441,7 +447,8 @@ export async function initializeItemsSync() {
     shapeSubscriptions['item_topics'] = shapes[2];
     shapeSubscriptions['item_likes'] = shapes[3];
 
-    console.log('[ItemsSync] Shapes subscribed successfully');
+    const t4 = performance.now();
+    console.log(`[ItemsSync] Shapes subscribed successfully (elapsed: ${(t4 - t0).toFixed(0)}ms)`);
   } catch (err) {
     console.error('[ItemsSync] initializeItemsSync failed:', err);
     isSyncing = false;
