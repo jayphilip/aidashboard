@@ -389,6 +389,7 @@ export async function initializeItemsSync() {
           url: proxyUrl,
           params: {
             table: 'item_topics',
+            where: `item_id IN (SELECT id FROM items WHERE published_at >= '${cutoffIso}')`,
           },
         },
         table: 'item_topics',
@@ -407,6 +408,7 @@ export async function initializeItemsSync() {
           url: proxyUrl,
           params: {
             table: 'item_likes',
+            where: `item_id IN (SELECT id FROM items WHERE published_at >= '${cutoffIso}')`,
           },
         },
         table: 'item_likes',
