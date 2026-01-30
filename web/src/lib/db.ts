@@ -2,7 +2,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { electricSync } from '@electric-sql/pglite-sync';
 import { drizzle } from 'drizzle-orm/pglite';
-import { papers, sources, items, itemTopics, itemLikes } from '$lib/schema';
+import { papers, sources, items, itemTopics, itemLikes } from './schema';
 
 // Singleton-style promises so we only initialise once per tab
 let pglitePromise: Promise<PGlite> | null = null;
@@ -24,6 +24,16 @@ export function getDb() {
   if (!dbPromise) {
     dbPromise = (async () => {
       const pg = await getPGlite();
+
+      // Drop foreign key constraints that interfere with parallel sync
+      // Electric enforces referential integrity on the server, so we don't need FKs in the browser
+      await pg.exec(`
+        ALTER TABLE IF EXISTS items DROP CONSTRAINT IF EXISTS items_source_id_fkey;
+        ALTER TABLE IF EXISTS item_topics DROP CONSTRAINT IF EXISTS item_topics_item_id_fkey;
+        ALTER TABLE IF EXISTS item_likes DROP CONSTRAINT IF EXISTS item_likes_item_id_fkey;
+      `).catch(err => {
+        console.warn('[DB] Failed to drop FK constraints (may not exist):', err);
+      });
 
       // Ensure local tables exist (schema matches server)
       await pg.exec(`

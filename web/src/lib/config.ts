@@ -22,7 +22,7 @@ export function getElectricUrl(): string {
   }
 
   // Try import.meta.env
-  url = import.meta.env.PUBLIC_ELECTRIC_URL;
+  url = import.meta.env.VITE_PUBLIC_ELECTRIC_URL;
   if (url) {
     console.log('Using import.meta.env URL:', url);
     return url;
@@ -39,8 +39,8 @@ export function getElectricUrl(): string {
 
   console.error('No Electric URL found in any source');
   throw new Error(
-    'PUBLIC_ELECTRIC_URL not configured. ' +
-    'Set PUBLIC_ELECTRIC_URL in .env.local and restart dev server.'
+    'VITE_PUBLIC_ELECTRIC_URL not configured. ' +
+    'Set VITE_PUBLIC_ELECTRIC_URL in .env.local and restart dev server.'
   );
 }
 

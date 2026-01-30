@@ -1,5 +1,5 @@
 // web/src/lib/scoring.ts
-import type { Item, ItemLike } from '$lib/stores/items';
+import type { Item, ItemLike } from './items';
 
 /**
  * Scoring algorithm for ranking items
