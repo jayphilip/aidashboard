@@ -45,7 +45,10 @@ function tryCompletingSync(
     console.log('[ItemsSync] All shapes synced, completing initialization');
     syncCompleted = true;
     refreshCallback();
-    isSyncing = false;
+      const electricUrl = '/v1/shape';
+      const electricFetchUrl = typeof window !== 'undefined'
+        ? new URL(electricUrl, window.location.origin).toString()
+        : electricUrl;
     setLoading(false);
     setError(null);
 
@@ -61,7 +64,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     loading: false,
     error: null,
     items: [],
-  });
+            const url = `${electricFetchUrl}?offset=-1&table=${encodeURIComponent(table)}&limit=10`;
 
   const setLoading = (loading: boolean) => {
     setState(prev => ({ ...prev, loading }));
@@ -111,7 +114,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
     hasInitialized.current = true;
     isSyncing = true;
-    setLoading(true);
+              url: `${electricFetchUrl}?offset=-1`,
     setError(null);
 
     try {
@@ -123,7 +126,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       console.log(`[ItemsSync] PGlite initialized in ${(performance.now() - t1).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
       // IMPORTANT: Initialize database schema BEFORE starting sync
-      const t1b = performance.now();
+              url: electricFetchUrl,
       await getDb();
       console.log(`[ItemsSync] Database schema created in ${(performance.now() - t1b).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
@@ -133,7 +136,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const electricUrl = '/v1/shape';
 
       const t2 = performance.now();
-      console.log(`[ItemsSync] Starting sync with Electric: ${electricUrl} (elapsed: ${(t2 - t0).toFixed(0)}ms)`);
+              url: electricFetchUrl,
 
       // Calculate 7-day cutoff for shape filtering
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -143,7 +146,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const t3 = performance.now();
       // Before creating subscriptions, ensure local PGlite isn't stale compared to server
       async function ensureLocalIsFresh(electricUrlParam: string, pgInstance: any) {
-        try {
+              url: electricFetchUrl,
           const resp = await fetch(`${electricUrlParam}?offset=-1&limit=1&table=items`);
           if (!resp.ok) return;
           const body = await resp.json();
