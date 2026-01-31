@@ -361,7 +361,7 @@ export async function initializeItemsSync() {
           params: {
             table: 'items',
             offset: -1,
-            where: `published_at >= '${cutoffIso}'`,
+            where: `COALESCE(published_at, created_at) >= '${cutoffIso}'`,
           },
         },
         table: 'items',
