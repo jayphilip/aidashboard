@@ -98,16 +98,37 @@ export async function toggleSourceActive(sourceId: number, active: boolean) {
  */
 export async function updateSource(
   sourceId: number,
-  updates: { ingestUrl?: string; frequency?: string; meta?: any }
+  updates: Partial<{
+    name: string;
+    type: string;
+    medium: string;
+    ingestUrl: string | null | undefined;
+    active: boolean;
+    frequency: string | null | undefined;
+    meta: any;
+  }>
 ) {
   try {
     const db = await getDb();
     await db
       .update(sources)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as any)
       .where(eq(sources.id, sourceId));
   } catch (err) {
     console.error('Failed to update source:', err);
+    throw err;
+  }
+}
+
+/**
+ * Delete a source by id
+ */
+export async function deleteSource(sourceId: number) {
+  try {
+    const db = await getDb();
+    await db.delete(sources).where(eq(sources.id, sourceId));
+  } catch (err) {
+    console.error('Failed to delete source:', err);
     throw err;
   }
 }
