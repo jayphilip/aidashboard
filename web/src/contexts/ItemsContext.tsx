@@ -139,7 +139,59 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const cutoffIso = sevenDaysAgo.toISOString();
 
       const t3 = performance.now();
+      // Before creating subscriptions, ensure local PGlite isn't stale compared to server
+      async function ensureLocalIsFresh(electricUrlParam: string, pgInstance: any) {
+        try {
+          const resp = await fetch(`${electricUrlParam}?offset=-1&limit=1&table=items`);
+          if (!resp.ok) return;
+          const body = await resp.json();
+          let serverRow: any = null;
+          if (Array.isArray(body) && body.length > 0) serverRow = body[0];
+          else if (body && body.rows && body.rows.length > 0) serverRow = body.rows[0];
+          const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
+          if (!serverIso) return;
+          const serverMax = new Date(serverIso).getTime();
+
+          const localRes = await pgInstance.query("SELECT max(COALESCE(published_at, created_at))::text AS max_date FROM items;");
+          const localIso = localRes?.rows?.[0]?.max_date ?? null;
+          const localMax = localIso ? new Date(localIso).getTime() : 0;
+
+          // If server is newer by >60s, clear local DB and reload to force fresh snapshot
+          if (serverMax - localMax > 60_000) {
+            console.warn('[ItemsSync] Server has newer data, resetting local DB (delta ms):', serverMax - localMax);
+            try {
+              if ((indexedDB as any)?.databases) {
+                const dbs = await (indexedDB as any).databases();
+                await Promise.all(dbs.map((d: any) => {
+                  const name: string = d.name ?? '';
+                  if (/pglite|electric|aidashboard|pglite_db/i.test(name)) {
+                    return new Promise<void>((resolve) => {
+                      const req = indexedDB.deleteDatabase(name);
+                      req.onsuccess = () => resolve();
+                      req.onerror = () => resolve();
+                      req.onblocked = () => resolve();
+                    });
+                  }
+                  return Promise.resolve();
+                }));
+              } else {
+                await Promise.all([
+                  new Promise<void>(r => { const rq = indexedDB.deleteDatabase('pglite'); rq.onsuccess = r; rq.onerror = r; rq.onblocked = r; }),
+                  new Promise<void>(r => { const rq = indexedDB.deleteDatabase('electric'); rq.onsuccess = r; rq.onerror = r; rq.onblocked = r; }),
+                ]);
+              }
+            } catch (err) {
+              console.warn('[ItemsSync] error deleting IndexedDB:', err);
+            }
+            window.location.reload();
+          }
+        } catch (err) {
+          console.warn('[ItemsSync] ensureLocalIsFresh error (ignored):', err);
+        }
+      }
+
       console.log(`[ItemsSync] Creating shape subscriptions (elapsed: ${(t3 - t0).toFixed(0)}ms)`);
+      await ensureLocalIsFresh(electricUrl, pg);
 
       // Add timeout to prevent infinite spinner
       const syncTimeout = setTimeout(() => {
