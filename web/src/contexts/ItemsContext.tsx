@@ -356,7 +356,21 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           if (error instanceof Error) {
             console.error('[ItemsSync] Error stack:', error.stack);
           }
-          setError((error as Error).message ?? String(error));
+          const errStr = (error as any)?.message ?? String(error);
+          setError(errStr);
+
+          // If Electric indicates the shape is out-of-sync (409 / must-refetch),
+          // force a local freshness check which will delete IndexedDB and reload.
+          try {
+            const is409 = (error as any)?.status === 409 || String(error).includes('409') || String(error).includes('must-refetch');
+            if (is409) {
+              console.warn('[ItemsSync] Detected 409/must-refetch from Electric, forcing local DB reset');
+              // best-effort: don't await to avoid blocking the handler
+              ensureLocalIsFresh(electricUrl, pg).catch(e => console.warn('[ItemsSync] ensureLocalIsFresh failed:', e));
+            }
+          } catch (e) {
+            console.warn('[ItemsSync] onError post-check failed:', e);
+          }
         },
       });
 
