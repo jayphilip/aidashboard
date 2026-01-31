@@ -1,6 +1,5 @@
 // web/src/lib/db.ts
 import { PGlite } from '@electric-sql/pglite';
-import { electricSync } from '@electric-sql/pglite-sync';
 import { drizzle } from 'drizzle-orm/pglite';
 import { papers, sources, items, itemTopics, itemLikes } from './schema';
 
@@ -12,9 +11,7 @@ export function getPGlite() {
   if (!pglitePromise) {
     pglitePromise = PGlite.create({
       dataDir: 'idb://aidashboard',
-      extensions: {
-        electric: electricSync(),
-      },
+      // No extensions needed - we'll use ShapeStream directly in ItemsContext
     });
   }
   return pglitePromise;
