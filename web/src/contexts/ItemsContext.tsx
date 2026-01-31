@@ -195,21 +195,28 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
       // Add timeout to prevent infinite spinner
       const syncTimeout = setTimeout(() => {
-        console.warn('[ItemsSync] Sync timeout after 5s - completing anyway');
+        const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
+        console.warn(`[ItemsSync] Sync timeout after ${elapsedSec}s`);
         if (!syncCompleted) {
-          shapesCompleted.add('items');
-          shapesCompleted.add('sources');
-          shapesCompleted.add('item_topics');
-          shapesCompleted.add('item_likes');
-          shapesSyncedCount = 4;
-          syncCompleted = true;
-          refreshItems();
-          isSyncing = false;
-          setLoading(false);
-          syncCompletionCallbacks.forEach(cb => cb());
-          syncCompletionCallbacks = [];
+          if (shapesSyncedCount === 0) {
+            console.warn('[ItemsSync] No shapes progressed; marking sync complete to avoid blocking UI');
+            shapesCompleted.add('items');
+            shapesCompleted.add('sources');
+            shapesCompleted.add('item_topics');
+            shapesCompleted.add('item_likes');
+            shapesSyncedCount = totalShapesToSync;
+            syncCompleted = true;
+            refreshItems();
+            isSyncing = false;
+            setLoading(false);
+            syncCompletionCallbacks.forEach(cb => cb());
+            syncCompletionCallbacks = [];
+          } else {
+            console.warn('[ItemsSync] Partial progress detected; keeping sync running in background and clearing loading state');
+            setLoading(false);
+          }
         }
-      }, 5000);
+      }, 30000);
 
       // Use the official syncShapesToTables API (plural) for syncing multiple tables
       console.log('[ItemsSync] Starting multi-table sync with syncShapesToTables');
