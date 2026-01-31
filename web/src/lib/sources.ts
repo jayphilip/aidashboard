@@ -1,7 +1,7 @@
 // web/src/lib/sources.ts
 import type { InferSelectModel } from 'drizzle-orm';
 import { desc, eq } from 'drizzle-orm';
-import { getDb } from './db';
+import { getDb, getPGlite } from './db';
 import { sources } from './schema';
 
 export type Source = InferSelectModel<typeof sources>;
@@ -140,12 +140,32 @@ export async function createSource(
   source: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>
 ) {
   try {
-    const db = await getDb();
-    await db.insert(sources).values({
-      ...source,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as any);
+    // Use raw upsert SQL against the local PGlite instance to avoid
+    // primary-key sequence conflicts when inserting.
+    const pg = await getPGlite();
+    const now = new Date().toISOString();
+    await pg.exec(
+      `INSERT INTO sources (name, type, medium, ingest_url, active, frequency, meta, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
+       ON CONFLICT (name, type) DO UPDATE SET
+         medium = EXCLUDED.medium,
+         ingest_url = EXCLUDED.ingest_url,
+         active = EXCLUDED.active,
+         frequency = EXCLUDED.frequency,
+         meta = EXCLUDED.meta,
+         updated_at = EXCLUDED.updated_at;`,
+      [
+        source.name,
+        source.type,
+        source.medium,
+        source.ingestUrl ?? null,
+        source.active ?? true,
+        source.frequency ?? null,
+        JSON.stringify(source.meta ?? {}),
+        now,
+        now,
+      ],
+    );
   } catch (err) {
     console.error('Failed to create source:', err);
     throw err;
