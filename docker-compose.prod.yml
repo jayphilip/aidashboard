@@ -75,7 +75,7 @@ services:
       PUBLIC_ELECTRIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
       ELECTRIC_SECRET: ${ELECTRIC_SECRET:-changeme}
     ports:
-      - "5173:3000"  # Expose web app on port 5173 (or configure via reverse proxy)
+      - "5173:80"  # Expose nginx web app on port 5173
     depends_on:
       - electric
     networks:
