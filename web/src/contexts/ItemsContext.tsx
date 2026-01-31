@@ -361,6 +361,32 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         console.warn('[ItemsSync] fallback refresh after subscribe failed:', e);
       }
 
+      // Stronger fallback: mark sync as completed and resolve any waiters
+      // so the UI won't block waiting for an onInitialSync that may never fire
+      // for resumed syncs. Background sync continues.
+      try {
+        if (!syncCompleted) {
+          console.log('[ItemsSync] Applying subscribe fallback: marking sync completed to unblock UI');
+          shapesCompleted.add('items');
+          shapesCompleted.add('sources');
+          shapesCompleted.add('item_topics');
+          shapesCompleted.add('item_likes');
+          shapesSyncedCount = totalShapesToSync;
+
+          syncCompleted = true;
+          isSyncing = false;
+          setLoading(false);
+          setError(null);
+          // best-effort refresh
+          refreshItems().catch(() => {});
+
+          syncCompletionCallbacks.forEach(cb => cb());
+          syncCompletionCallbacks = [];
+        }
+      } catch (e) {
+        console.warn('[ItemsSync] subscribe fallback marking sync completed failed:', e);
+      }
+
       // Check if sync is already up-to-date (resumed from persisted state)
       if (syncResult.isUpToDate) {
         console.log('[ItemsSync] Sync already up-to-date (resumed from cache)');
