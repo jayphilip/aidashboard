@@ -241,96 +241,69 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       }
 
       // Start sync
-      const syncResult = await (pg as any).electric.syncShapesToTables({
-        key: 'items-sync',
-        shapes: {
-          items: {
-            shape: {
-              url: baseUrl,
-              params: {
-                table: 'items',
-                where: `published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`,
-              },
-            },
-            table: 'items',
-            primaryKey: ['id'],
-          },
-          sources: {
-            shape: {
-              url: baseUrl,
-              params: {
-                table: 'sources',
-              },
-            },
-            table: 'sources',
-            primaryKey: ['id'],
-          },
-          item_topics: {
-            shape: {
-              url: baseUrl,
-              params: {
-                table: 'item_topics',
-              },
-            },
-            table: 'item_topics',
-            primaryKey: ['id'],
-          },
-          item_likes: {
-            shape: {
-              url: baseUrl,
-              params: {
-                table: 'item_likes',
-              },
-            },
-            table: 'item_likes',
-            primaryKey: ['id'],
-          },
+const syncResult = await (pg as any).electric.syncShapesToTables({
+  // COMMENTED OUT - will re-enable after confirming it works
+  // key: 'items-sync',
+  
+  shapes: {
+    items: {
+      shape: {
+        url: baseUrl,
+        params: {
+          table: 'items',
+          where: `published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`,
         },
-        onInitialSync: () => {
-          console.log('[ItemsSync] Initial sync complete!');
-          clearTimeout(syncTimeout);
-          completeSyncFlow();
+      },
+      table: 'items',
+      primaryKey: ['id'],
+    },
+    sources: {
+      shape: {
+        url: baseUrl,
+        params: {
+          table: 'sources',
         },
-        onError: async (error: unknown) => {
-          console.error('[ItemsSync] Sync error:', error);
-          console.error('[ItemsSync] Error details:', {
-            type: typeof error,
-            keys: Object.keys(error || {}),
-            message: (error as any)?.message,
-            full: JSON.stringify(error, null, 2)
-          });
-          
-          clearTimeout(syncTimeout);
-          
-          const errStr = (error as any)?.message ?? String(error);
-          const errorObj = error as any;
-          
-          const anyStatus = errorObj?.status ?? 
-                           errorObj?.response?.status ?? 
-                           errorObj?.statusCode;
-          
-          const errorMessage = errStr.toLowerCase();
-          const is409 = anyStatus === 409 || 
-                       anyStatus === '409' ||
-                       errorMessage.includes('409') || 
-                       errorMessage.includes('conflict') ||
-                       errorMessage.includes('must-refetch') ||
-                       errorMessage.includes('expired');
+      },
+      table: 'sources',
+      primaryKey: ['id'],
+    },
+    item_topics: {
+      shape: {
+        url: baseUrl,
+        params: {
+          table: 'item_topics',
+        },
+      },
+      table: 'item_topics',
+      primaryKey: ['id'],
+    },
+    item_likes: {
+      shape: {
+        url: baseUrl,
+        params: {
+          table: 'item_likes',
+        },
+      },
+      table: 'item_likes',
+      primaryKey: ['id'],
+    },
+  },
+  onInitialSync: () => {
+    console.log('[ItemsSync] ✅ Initial sync complete!');
+    clearTimeout(syncTimeout);
+    completeSyncFlow();
+  },
+  onError: async (error: unknown) => {
+    console.error('[ItemsSync] ❌ Sync error:', error);
+    console.error('[ItemsSync] Error details:', JSON.stringify(error, null, 2));
+    
+    clearTimeout(syncTimeout);
+    setError(String(error));
+    isSyncing = false;
+    setLoading(false);
+  },
+});
 
-          console.log('[ItemsSync] Error analysis:', { anyStatus, is409, errorMessage });
-
-          if (is409) {
-            console.warn('[ItemsSync] Detected 409 - clearing local cache');
-            await clearLocalDB();
-            await new Promise(r => setTimeout(r, 100));
-            window.location.reload();
-          } else {
-            setError(errStr);
-            isSyncing = false;
-            setLoading(false);
-          }
-        },
-      });
 
       console.log('[ItemsSync] Shapes subscribed successfully');
       shapeSubscriptions['all'] = syncResult;
