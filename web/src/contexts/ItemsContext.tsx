@@ -127,8 +127,31 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       await getDb();
       console.log(`[ItemsSync] Database schema created in ${(performance.now() - t1b).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
-      // Connect directly to Electric (bypassing Vite proxy which struggles with streaming)
-      const electricUrl = 'http://localhost:3000/v1/shape';
+      // Resolve Electric host: prefer localhost (dev on same machine),
+      // otherwise try the web host's hostname (server) so remote browsers reach Electric.
+      async function resolveElectricBase() {
+        const tryBase = async (base: string, timeout = 2000) => {
+          try {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            const res = await fetch(`${base}/v1/shape?limit=1`, { signal: controller.signal });
+            clearTimeout(id);
+            return res.ok;
+          } catch (err) {
+            return false;
+          }
+        };
+
+        if (await tryBase('http://localhost:3000', 1500)) return 'http://localhost:3000';
+        const host = window.location.hostname;
+        const hostBase = `http://${host}:3000`;
+        if (await tryBase(hostBase, 3000)) return hostBase;
+        return 'http://localhost:3000';
+      }
+
+      const electricBase = await resolveElectricBase();
+      const electricUrl = `${electricBase}/v1/shape`;
+      console.log('[ItemsSync] Electric base URL resolved to', electricBase);
 
       const t2 = performance.now();
       console.log(`[ItemsSync] Starting sync with Electric: ${electricUrl} (elapsed: ${(t2 - t0).toFixed(0)}ms)`);
