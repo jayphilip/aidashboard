@@ -229,8 +229,9 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
               url: electricUrl,
               params: {
                 table: 'items',
-                // Temporarily removed where clause to test
-                // where: `published_at >= '${cutoffIso}'`,
+                offset: -1,
+                limit: 200,
+                where: `COALESCE(published_at, created_at) >= '${cutoffIso}'`,
               },
             },
             table: 'items',
