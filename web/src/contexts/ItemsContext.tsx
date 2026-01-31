@@ -230,7 +230,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
               params: {
                 table: 'items',
                 limit: 200,
-                where: `COALESCE(published_at, created_at) >= '${cutoffIso}'`,
+                where: `(published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}')`,
               },
             },
             table: 'items',
