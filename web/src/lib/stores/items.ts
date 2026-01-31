@@ -360,6 +360,7 @@ export async function initializeItemsSync() {
           url: proxyUrl,
           params: {
             table: 'items',
+            offset: -1,
             where: `published_at >= '${cutoffIso}'`,
           },
         },
@@ -386,6 +387,7 @@ export async function initializeItemsSync() {
           url: proxyUrl,
           params: {
             table: 'sources',
+            offset: -1,
           },
         },
         table: 'sources',
@@ -404,6 +406,7 @@ export async function initializeItemsSync() {
           url: proxyUrl,
           params: {
             table: 'item_topics',
+            offset: -1,
           },
         },
         table: 'item_topics',
@@ -427,6 +430,7 @@ export async function initializeItemsSync() {
           url: proxyUrl,
           params: {
             table: 'item_likes',
+            offset: -1,
           },
         },
         table: 'item_likes',

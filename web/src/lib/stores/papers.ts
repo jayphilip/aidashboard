@@ -51,6 +51,7 @@ export async function initializePapersSync() {
         url: `${ELECTRIC_URL}/v1/shape`,
         params: {
           table: 'papers',
+          offset: -1,
           subset__order_by: 'created_at DESC',
           subset__limit: 100,
         },
