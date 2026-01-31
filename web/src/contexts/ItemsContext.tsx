@@ -127,43 +127,10 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       await getDb();
       console.log(`[ItemsSync] Database schema created in ${(performance.now() - t1b).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
-      // Resolve Electric host: prefer localhost (dev on same machine),
-      // otherwise try the web host's hostname (server) so remote browsers reach Electric.
-      async function resolveElectricBase() {
-        const tryBase = async (base: string, timeout = 2000) => {
-          try {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            const res = await fetch(`${base}/v1/shape?limit=1`, { signal: controller.signal });
-            clearTimeout(id);
-            return res.ok;
-          } catch (err) {
-            return false;
-          }
-        };
-
-        const host = window.location.hostname;
-        const hostBase = `http://${host}:3000`;
-
-        // If the browser is running on a non-localhost host (i.e. remote client),
-        // prefer the web host first so we don't accidentally connect to a local
-        // dev Electric instance running on the user's machine.
-        const isClientLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
-        if (!isClientLocal) {
-          if (await tryBase(hostBase, 1500)) return hostBase;
-          if (await tryBase('http://localhost:3000', 1500)) return 'http://localhost:3000';
-          return hostBase;
-        }
-
-        // Default development flow: prefer localhost
-        if (await tryBase('http://localhost:3000', 1500)) return 'http://localhost:3000';
-        if (await tryBase(hostBase, 3000)) return hostBase;
-        return 'http://localhost:3000';
-      }
-
-      const electricBase = await resolveElectricBase();
-      const electricUrl = `${electricBase}/v1/shape`;
-      console.log('[ItemsSync] Electric base URL resolved to', electricBase);
+      // Use same-origin proxy for Electric shapes. The server should proxy
+      // `/v1/shape` to the Electric container so remote browsers hit the web
+      // origin rather than developer localhost.
+      const electricUrl = '/v1/shape';
 
       const t2 = performance.now();
       console.log(`[ItemsSync] Starting sync with Electric: ${electricUrl} (elapsed: ${(t2 - t0).toFixed(0)}ms)`);
