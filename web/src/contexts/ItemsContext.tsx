@@ -226,10 +226,9 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         shapes: {
           items: {
             shape: {
-              url: electricUrl,
+              url: `${electricUrl}?offset=-1`,
               params: {
                 table: 'items',
-                offset: -1,
                 limit: 200,
                 where: `COALESCE(published_at, created_at) >= '${cutoffIso}'`,
               },
