@@ -195,27 +195,55 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
       // Add timeout to prevent infinite spinner
       const syncTimeout = setTimeout(() => {
-        const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
-        console.warn(`[ItemsSync] Sync timeout after ${elapsedSec}s`);
-        if (!syncCompleted) {
+        (async () => {
+          const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
+          console.warn(`[ItemsSync] Sync timeout after ${elapsedSec}s`);
+          if (syncCompleted) return;
+
+          async function shapeReachable(table: string) {
+            const url = `${electricUrl}?offset=-1&table=${encodeURIComponent(table)}&limit=10`;
+            for (let attempt = 0; attempt < 2; attempt++) {
+              try {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), 4000);
+                const r = await fetch(url, { signal: controller.signal });
+                clearTimeout(id);
+                if (r.ok) return true;
+              } catch (e) {
+                // ignore and retry
+              }
+              await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+            }
+            return false;
+          }
+
           if (shapesSyncedCount === 0) {
-            console.warn('[ItemsSync] No shapes progressed; marking sync complete to avoid blocking UI');
-            shapesCompleted.add('items');
-            shapesCompleted.add('sources');
-            shapesCompleted.add('item_topics');
-            shapesCompleted.add('item_likes');
-            shapesSyncedCount = totalShapesToSync;
-            syncCompleted = true;
-            refreshItems();
-            isSyncing = false;
-            setLoading(false);
-            syncCompletionCallbacks.forEach(cb => cb());
-            syncCompletionCallbacks = [];
+            // If no shapes progressed, probe the shape endpoints before deciding
+            const tables = ['items', 'sources', 'item_topics', 'item_likes'];
+            const results = await Promise.all(tables.map(t => shapeReachable(t)));
+            const anyReachable = results.some(Boolean);
+            if (!anyReachable) {
+              console.warn('[ItemsSync] No shapes progressed and none reachable; marking sync complete to avoid blocking UI');
+              shapesCompleted.add('items');
+              shapesCompleted.add('sources');
+              shapesCompleted.add('item_topics');
+              shapesCompleted.add('item_likes');
+              shapesSyncedCount = totalShapesToSync;
+              syncCompleted = true;
+              refreshItems();
+              isSyncing = false;
+              setLoading(false);
+              syncCompletionCallbacks.forEach(cb => cb());
+              syncCompletionCallbacks = [];
+            } else {
+              console.warn('[ItemsSync] Shape endpoints reachable; keeping sync running in background and clearing loading state');
+              setLoading(false);
+            }
           } else {
             console.warn('[ItemsSync] Partial progress detected; keeping sync running in background and clearing loading state');
             setLoading(false);
           }
-        }
+        })();
       }, 30000);
 
       // Use the official syncShapesToTables API (plural) for syncing multiple tables
