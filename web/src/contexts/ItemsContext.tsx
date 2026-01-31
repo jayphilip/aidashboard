@@ -351,6 +351,16 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const t4 = performance.now();
       console.log(`[ItemsSync] Shapes subscribed successfully (elapsed: ${(t4 - t0).toFixed(0)}ms)`);
 
+      // Fallback: if onInitialSync doesn't fire for some reason, clear loading
+      // so the UI doesn't stay stuck on a spinner. Sync continues in background.
+      try {
+        setLoading(false);
+        setError(null);
+        await refreshItems();
+      } catch (e) {
+        console.warn('[ItemsSync] fallback refresh after subscribe failed:', e);
+      }
+
       // Check if sync is already up-to-date (resumed from persisted state)
       if (syncResult.isUpToDate) {
         console.log('[ItemsSync] Sync already up-to-date (resumed from cache)');
