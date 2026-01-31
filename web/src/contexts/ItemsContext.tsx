@@ -60,11 +60,15 @@ function tryCompletingSync(
 
 export function ItemsProvider({ children }: { children: ReactNode }) {
   const hasInitialized = useRef(false);
+  const electricUrl = '/v1/shape';
+  const electricFetchUrl = typeof window !== 'undefined'
+    ? new URL(electricUrl, window.location.origin).toString()
+    : electricUrl;
   const [state, setState] = useState<ItemsState>({
     loading: false,
     error: null,
     items: [],
-            const url = `${electricFetchUrl}?offset=-1&table=${encodeURIComponent(table)}&limit=10`;
+  });
 
   const setLoading = (loading: boolean) => {
     setState(prev => ({ ...prev, loading }));
@@ -114,7 +118,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
     hasInitialized.current = true;
     isSyncing = true;
-              url: `${electricFetchUrl}?offset=-1`,
     setError(null);
 
     try {
@@ -126,7 +129,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       console.log(`[ItemsSync] PGlite initialized in ${(performance.now() - t1).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
       // IMPORTANT: Initialize database schema BEFORE starting sync
-              url: electricFetchUrl,
+      const t1b = performance.now();
       await getDb();
       console.log(`[ItemsSync] Database schema created in ${(performance.now() - t1b).toFixed(0)}ms (total: ${(performance.now() - t0).toFixed(0)}ms)`);
 
@@ -136,17 +139,16 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const electricUrl = '/v1/shape';
 
       const t2 = performance.now();
-              url: electricFetchUrl,
 
       // Calculate 7-day cutoff for shape filtering
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       sevenDaysAgo.setUTCHours(0, 0, 0, 0);
       const cutoffIso = sevenDaysAgo.toISOString();
 
-      const t3 = performance.now();
+        const t3 = performance.now();
       // Before creating subscriptions, ensure local PGlite isn't stale compared to server
       async function ensureLocalIsFresh(electricUrlParam: string, pgInstance: any) {
-              url: electricFetchUrl,
+        try {
           const resp = await fetch(`${electricUrlParam}?offset=-1&limit=1&table=items`);
           if (!resp.ok) return;
           const body = await resp.json();
