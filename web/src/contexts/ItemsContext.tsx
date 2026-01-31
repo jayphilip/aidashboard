@@ -261,7 +261,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         shapes: {
           items: {
             shape: {
-              url: `${electricUrl}?offset=-1`,
+              url: `${electricFetchUrl}?offset=-1`,
               params: {
                 table: 'items',
                 limit: 200,
@@ -273,7 +273,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           },
           sources: {
             shape: {
-              url: electricUrl,
+              url: electricFetchUrl,
               params: {
                 table: 'sources',
               },
@@ -283,7 +283,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           },
           item_topics: {
             shape: {
-              url: electricUrl,
+              url: electricFetchUrl,
               params: {
                 table: 'item_topics',
               },
@@ -293,7 +293,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           },
           item_likes: {
             shape: {
-              url: electricUrl,
+              url: electricFetchUrl,
               params: {
                 table: 'item_likes',
               },
