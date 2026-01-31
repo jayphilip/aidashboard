@@ -58,13 +58,16 @@ export async function getRecentItems(
     const db = await getDb();
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    const rows = await db
+    let qb: any = db
       .select()
       .from(items)
-      .where(gte(items.publishedAt, cutoff))
-      .orderBy(desc(items.publishedAt))
-      .limit(limit)
-      .offset(offset);
+      .where(sql`COALESCE(${items.publishedAt}, ${items.createdAt}) >= ${cutoff}`)
+      .orderBy(desc(items.publishedAt));
+
+    if (limit && limit > 0) qb = qb.limit(limit);
+    if (offset && offset > 0) qb = qb.offset(offset);
+
+    const rows = await qb;
     return rows;
   } catch (err) {
     logger.warn('Failed to get recent items, returning empty array:', err);
