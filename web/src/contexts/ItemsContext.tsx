@@ -147,15 +147,37 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
         const t3 = performance.now();
       // Before creating subscriptions, ensure local PGlite isn't stale compared to server
-      async function ensureLocalIsFresh(electricUrlParam: string, pgInstance: any) {
+      async function ensureLocalIsFresh(baseUrl: string, pgInstance: any) {
         try {
-          const resp = await fetch(`${electricUrlParam}?offset=-1&limit=1&table=items`);
+          const probeUrl = `${baseUrl}?offset=-1&limit=1&table=items`;
+          const resp = await fetch(probeUrl);
           if (!resp.ok) return;
-          const body = await resp.json();
-          let serverRow: any = null;
-          if (Array.isArray(body) && body.length > 0) serverRow = body[0];
-          else if (body && body.rows && body.rows.length > 0) serverRow = body.rows[0];
-          const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
+
+          const contentType = resp.headers.get('content-type') || '';
+          let rows: any[] = [];
+
+          if (contentType.includes('application/json')) {
+            const json = await resp.json();
+            rows = Array.isArray(json) ? json : (json?.rows ?? []);
+          } else {
+            // Fallback to NDJSON or line-delimited JSON where each line is { "value": {...} }
+            const text = await resp.text();
+            rows = text.trim().split('\n').filter(Boolean).map(line => {
+              try {
+                const parsed = JSON.parse(line);
+                return parsed?.value ?? parsed;
+              } catch (e) {
+                return null;
+              }
+            }).filter(Boolean);
+          }
+
+          console.log('[ItemsSync] ensureLocalIsFresh server response:', { contentType, rowCount: rows.length, sample: rows[0] });
+          if (!rows.length) return;
+
+          // Take last row as the most recent in the probe
+          const serverRow = rows[rows.length - 1];
+          const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? serverRow?.publishedAt ?? serverRow?.createdAt ?? null;
           if (!serverIso) return;
           const serverMax = new Date(serverIso).getTime();
 
@@ -200,7 +222,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       console.log(`[ItemsSync] Creating shape subscriptions (elapsed: ${(t3 - t0).toFixed(0)}ms)`);
       await ensureLocalIsFresh(electricUrl, pg);
 
-      // Add timeout to prevent infinite spinner
+      // Add timeout to prevent infinite spinner (shorter for slow/latency networks)
       const syncTimeout = setTimeout(() => {
         (async () => {
           const elapsedSec = ((performance.now() - t0) / 1000).toFixed(1);
@@ -251,7 +273,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             setLoading(false);
           }
         })();
-      }, 30000);
+      }, 8000);
 
       // Use the official syncShapesToTables API (plural) for syncing multiple tables
       console.log('[ItemsSync] Starting multi-table sync with syncShapesToTables');
@@ -303,27 +325,31 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           },
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] ALL shapes initial sync complete!');
-          clearTimeout(syncTimeout);
+          try {
+            console.log('[ItemsSync] ALL shapes initial sync complete!');
+            clearTimeout(syncTimeout);
 
-          // Mark all shapes as synced
-          shapesCompleted.add('items');
-          shapesCompleted.add('sources');
-          shapesCompleted.add('item_topics');
-          shapesCompleted.add('item_likes');
-          shapesSyncedCount = 4;
+            // Mark all shapes as synced
+            shapesCompleted.add('items');
+            shapesCompleted.add('sources');
+            shapesCompleted.add('item_topics');
+            shapesCompleted.add('item_likes');
+            shapesSyncedCount = totalShapesToSync;
 
-          syncCompleted = true;
-          refreshItems();
-          isSyncing = false;
-          setLoading(false);
-          setError(null);
+            syncCompleted = true;
+            refreshItems();
+            isSyncing = false;
+            setLoading(false);
+            setError(null);
 
-          // Call any waiting callbacks
-          syncCompletionCallbacks.forEach(cb => cb());
-          syncCompletionCallbacks = [];
+            // Call any waiting callbacks
+            syncCompletionCallbacks.forEach(cb => cb());
+            syncCompletionCallbacks = [];
+          } catch (e) {
+            console.warn('[ItemsSync] onInitialSync handler failed:', e);
+          }
         },
-        onError: (error: unknown) => {
+        onError: async (error: unknown) => {
           console.error('[ItemsSync] Global sync error:', error);
           if (error instanceof Error) {
             console.error('[ItemsSync] Error stack:', error.stack);
@@ -331,20 +357,56 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           const errStr = (error as any)?.message ?? String(error);
           setError(errStr);
 
-          // If Electric indicates the shape is out-of-sync (409 / must-refetch),
-          // force a local freshness check which will delete IndexedDB and reload.
+          // Comprehensive 409 / must-refetch detection
           try {
-            const is409 = (error as any)?.status === 409 || String(error).includes('409') || String(error).includes('must-refetch');
+            const anyStatus = (error as any)?.status ?? (error as any)?.response?.status ?? null;
+            const is409 = anyStatus === 409 || String(error).includes('409') || String(error).toLowerCase().includes('must-refetch');
             if (is409) {
               console.warn('[ItemsSync] Detected 409/must-refetch from Electric, forcing local DB reset');
-              // best-effort: don't await to avoid blocking the handler
-              ensureLocalIsFresh(electricUrl, pg).catch(e => console.warn('[ItemsSync] ensureLocalIsFresh failed:', e));
+              try {
+                await ensureLocalIsFresh(electricFetchUrl, pg);
+                // after clearing local DB, reload to reinitialize sync from fresh snapshot
+                window.location.reload();
+              } catch (e) {
+                console.warn('[ItemsSync] ensureLocalIsFresh failed during onError handling:', e);
+              }
             }
           } catch (e) {
             console.warn('[ItemsSync] onError post-check failed:', e);
           }
         },
       });
+
+      // If the sync API exposes a `synced` promise, await it to mark completion
+      try {
+        if (syncResult && typeof (syncResult as any).synced?.then === 'function') {
+          console.log('[ItemsSync] waiting for syncResult.synced promise');
+          try {
+            await (syncResult as any).synced;
+            console.log('[ItemsSync] syncResult.synced resolved');
+            clearTimeout(syncTimeout);
+
+            // Mark as completed similar to onInitialSync
+            shapesCompleted.add('items');
+            shapesCompleted.add('sources');
+            shapesCompleted.add('item_topics');
+            shapesCompleted.add('item_likes');
+            shapesSyncedCount = totalShapesToSync;
+
+            syncCompleted = true;
+            refreshItems();
+            isSyncing = false;
+            setLoading(false);
+            setError(null);
+            syncCompletionCallbacks.forEach(cb => cb());
+            syncCompletionCallbacks = [];
+          } catch (e) {
+            console.warn('[ItemsSync] syncResult.synced rejected:', e);
+          }
+        }
+      } catch (e) {
+        console.warn('[ItemsSync] error handling syncResult.synced:', e);
+      }
 
       shapeSubscriptions['all'] = syncResult;
 
