@@ -142,9 +142,21 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           }
         };
 
-        if (await tryBase('http://localhost:3000', 1500)) return 'http://localhost:3000';
         const host = window.location.hostname;
         const hostBase = `http://${host}:3000`;
+
+        // If the browser is running on a non-localhost host (i.e. remote client),
+        // prefer the web host first so we don't accidentally connect to a local
+        // dev Electric instance running on the user's machine.
+        const isClientLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
+        if (!isClientLocal) {
+          if (await tryBase(hostBase, 1500)) return hostBase;
+          if (await tryBase('http://localhost:3000', 1500)) return 'http://localhost:3000';
+          return hostBase;
+        }
+
+        // Default development flow: prefer localhost
+        if (await tryBase('http://localhost:3000', 1500)) return 'http://localhost:3000';
         if (await tryBase(hostBase, 3000)) return hostBase;
         return 'http://localhost:3000';
       }
