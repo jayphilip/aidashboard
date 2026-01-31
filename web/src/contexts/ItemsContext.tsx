@@ -88,78 +88,85 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
   // Ensure local DB is fresh compared to server
   const ensureLocalIsFresh = async (pgInstance: any) => {
+  // Check if we just cleared DB in last 5 seconds
+  const lastClear = localStorage.getItem('sync-last-clear');
+  const now = Date.now();
+  
+  if (lastClear && now - parseInt(lastClear) < 5000) {
+    console.log('[ItemsSync] Skipping freshness check (recently cleared)');
+    localStorage.removeItem('sync-last-clear');
+    return;
+  }
+
+  try {
+    const probeUrl = `${window.location.origin}/v1/shape?table=items&offset=-1`;
+    console.log('[ItemsSync] Probing:', probeUrl);
+    
+    const resp = await fetch(probeUrl);
+    if (!resp.ok) {
+      console.log('[ItemsSync] Server probe failed:', resp.status);
+      return;
+    }
+
+    const data = await resp.json();
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      console.log('[ItemsSync] No data in response');
+      return;
+    }
+
+    const rows = data.map((item: any) => item.value).filter(Boolean);
+    
+    if (rows.length === 0) {
+      console.log('[ItemsSync] No valid rows parsed');
+      return;
+    }
+
+    const serverRow = rows[rows.length - 1];
+    const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
+    
+    if (!serverIso) {
+      console.log('[ItemsSync] No timestamp in server row');
+      return;
+    }
+    
+    const serverMax = new Date(serverIso).getTime();
+
+    // Check if items table exists and has data
+    let localMax = 0;
     try {
-      const probeUrl = `${window.location.origin}/v1/shape?table=items&offset=-1`;
-      console.log('[ItemsSync] Probing:', probeUrl);
-      
-      const resp = await fetch(probeUrl);
-      if (!resp.ok) {
-        console.log('[ItemsSync] Server probe failed:', resp.status);
-        return;
-      }
-
-      // Electric returns JSON array: [{"key":"...","value":{...}}, ...]
-      const data = await resp.json();
-      console.log('[ItemsSync] Response type:', Array.isArray(data) ? 'array' : 'object', 'length:', data?.length);
-      
-      if (!Array.isArray(data) || data.length === 0) {
-        console.log('[ItemsSync] No data in response');
-        return;
-      }
-
-      // Extract values from array of {key, value} objects
-      const rows = data.map((item: any) => item.value).filter(Boolean);
-      
-      console.log('[ItemsSync] Parsed rows:', { 
-        totalItems: data.length,
-        rowCount: rows.length, 
-        firstRow: rows[0],
-        lastRow: rows[rows.length - 1]
-      });
-
-      if (rows.length === 0) {
-        console.log('[ItemsSync] No valid rows parsed');
-        return;
-      }
-
-      // Get the newest row (last in response)
-      const serverRow = rows[rows.length - 1];
-      const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
-      
-      if (!serverIso) {
-        console.log('[ItemsSync] No timestamp in server row, fields:', Object.keys(serverRow || {}));
-        return;
-      }
-      
-      const serverMax = new Date(serverIso).getTime();
-
-      // Check local max timestamp
       const localRes = await pgInstance.query(
         "SELECT max(COALESCE(published_at, created_at))::text AS max_date FROM items;"
       );
       const localIso = localRes?.rows?.[0]?.max_date ?? null;
-      const localMax = localIso ? new Date(localIso).getTime() : 0;
-
-      console.log('[ItemsSync] Timestamp comparison:', { 
-        serverIso, 
-        localIso, 
-        serverMax,
-        localMax,
-        deltaMs: serverMax - localMax 
-      });
-
-      // If server is newer by >60s, reset local DB
-      if (serverMax - localMax > 60_000) {
-        console.warn('[ItemsSync] Server has newer data, resetting (delta ms):', serverMax - localMax);
-        await clearLocalDB();
-        window.location.reload();
-      } else {
-        console.log('[ItemsSync] Local DB is up to date (or newer)');
-      }
-    } catch (err) {
-      console.error('[ItemsSync] ensureLocalIsFresh error:', err);
+      localMax = localIso ? new Date(localIso).getTime() : 0;
+    } catch (e) {
+      console.log('[ItemsSync] Could not query local items table:', e);
+      return; // Table doesn't exist yet, skip check
     }
-  };
+
+    console.log('[ItemsSync] Timestamp comparison:', { 
+      serverIso, 
+      localMax,
+      deltaMs: serverMax - localMax,
+      deltaHours: ((serverMax - localMax) / 3600000).toFixed(1)
+    });
+
+    // Only reset if local DB has data but is stale (>1 hour old)
+    if (localMax > 0 && serverMax - localMax > 3600_000) {
+      console.warn('[ItemsSync] Server significantly newer, resetting');
+      localStorage.setItem('sync-last-clear', now.toString());
+      await clearLocalDB();
+      window.location.reload();
+    } else {
+      console.log('[ItemsSync] Local DB acceptable or empty (will sync)');
+    }
+    
+  } catch (err) {
+    console.error('[ItemsSync] ensureLocalIsFresh error:', err);
+  }
+};
+
 
   const initializeSync = useCallback(async () => {
     if (hasInitialized.current) {
