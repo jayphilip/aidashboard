@@ -57,6 +57,110 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Clear IndexedDB databases
+  const clearLocalDB = async () => {
+    try {
+      if ((indexedDB as any)?.databases) {
+        const dbs = await (indexedDB as any).databases();
+        await Promise.all(dbs.map((d: any) => {
+          const name: string = d.name ?? '';
+          if (/pglite|electric|aidashboard/i.test(name)) {
+            return new Promise<void>((resolve) => {
+              const req = indexedDB.deleteDatabase(name);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+              req.onblocked = () => resolve();
+            });
+          }
+          return Promise.resolve();
+        }));
+      } else {
+        await Promise.all([
+          new Promise<void>(r => { const rq = indexedDB.deleteDatabase('pglite'); rq.onsuccess = r; rq.onerror = r; }),
+          new Promise<void>(r => { const rq = indexedDB.deleteDatabase('electric'); rq.onsuccess = r; rq.onerror = r; }),
+        ]);
+      }
+      console.log('[ItemsSync] IndexedDB cleared');
+    } catch (err) {
+      console.warn('[ItemsSync] Error deleting IndexedDB:', err);
+    }
+  };
+
+  // Ensure local DB is fresh compared to server
+  const ensureLocalIsFresh = async (pgInstance: any) => {
+    try {
+      const probeUrl = `${window.location.origin}/v1/shape?table=items&offset=-1`;
+      console.log('[ItemsSync] Probing:', probeUrl);
+      
+      const resp = await fetch(probeUrl);
+      if (!resp.ok) {
+        console.log('[ItemsSync] Server probe failed:', resp.status);
+        return;
+      }
+
+      // Electric returns JSON array: [{"key":"...","value":{...}}, ...]
+      const data = await resp.json();
+      console.log('[ItemsSync] Response type:', Array.isArray(data) ? 'array' : 'object', 'length:', data?.length);
+      
+      if (!Array.isArray(data) || data.length === 0) {
+        console.log('[ItemsSync] No data in response');
+        return;
+      }
+
+      // Extract values from array of {key, value} objects
+      const rows = data.map((item: any) => item.value).filter(Boolean);
+      
+      console.log('[ItemsSync] Parsed rows:', { 
+        totalItems: data.length,
+        rowCount: rows.length, 
+        firstRow: rows[0],
+        lastRow: rows[rows.length - 1]
+      });
+
+      if (rows.length === 0) {
+        console.log('[ItemsSync] No valid rows parsed');
+        return;
+      }
+
+      // Get the newest row (last in response)
+      const serverRow = rows[rows.length - 1];
+      const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
+      
+      if (!serverIso) {
+        console.log('[ItemsSync] No timestamp in server row, fields:', Object.keys(serverRow || {}));
+        return;
+      }
+      
+      const serverMax = new Date(serverIso).getTime();
+
+      // Check local max timestamp
+      const localRes = await pgInstance.query(
+        "SELECT max(COALESCE(published_at, created_at))::text AS max_date FROM items;"
+      );
+      const localIso = localRes?.rows?.[0]?.max_date ?? null;
+      const localMax = localIso ? new Date(localIso).getTime() : 0;
+
+      console.log('[ItemsSync] Timestamp comparison:', { 
+        serverIso, 
+        localIso, 
+        serverMax,
+        localMax,
+        deltaMs: serverMax - localMax 
+      });
+
+      // If server is newer by >60s, reset local DB
+      if (serverMax - localMax > 60_000) {
+        console.warn('[ItemsSync] Server has newer data, resetting (delta ms):', serverMax - localMax);
+        await clearLocalDB();
+        window.location.reload();
+      } else {
+        console.log('[ItemsSync] Local DB is up to date (or newer)');
+      }
+    } catch (err) {
+      console.error('[ItemsSync] ensureLocalIsFresh error:', err);
+    }
+  };
+
   const initializeSync = useCallback(async () => {
     if (hasInitialized.current) {
       console.log('[ItemsSync] Already initialized, skipping');
@@ -102,16 +206,34 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           console.warn('[ItemsSync] Sync timeout reached, unblocking UI');
           completeSyncFlow();
         }
-      }, 10000);
+      }, 15000); // Increased to 15s for initial load
 
-      // CRITICAL: Use absolute URL with proper origin
+      // Use absolute URL with proper origin
       const baseUrl = typeof window !== 'undefined'
         ? `${window.location.origin}/v1/shape`
         : '/v1/shape';
 
       console.log('[ItemsSync] Using base URL:', baseUrl);
 
-      // Start sync - library will append ?table=xxx&offset=xxx
+      // Helper to complete sync flow
+      function completeSyncFlow() {
+        if (syncCompleted) return;
+        
+        console.log('[ItemsSync] Completing sync flow');
+        syncCompleted = true;
+        isSyncing = false;
+        setLoading(false);
+        setError(null);
+        
+        refreshItems().catch(err => 
+          console.warn('[ItemsSync] Refresh after sync failed:', err)
+        );
+        
+        syncCompletionCallbacks.forEach(cb => cb());
+        syncCompletionCallbacks = [];
+      }
+
+      // Start sync
       const syncResult = await (pg as any).electric.syncShapesToTables({
         key: 'items-sync',
         shapes: {
@@ -120,8 +242,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
               url: baseUrl,
               params: {
                 table: 'items',
-                // Note: offset is handled automatically by library
-                // where clause syntax depends on Electric version
                 where: `published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`,
               },
             },
@@ -166,21 +286,41 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         },
         onError: async (error: unknown) => {
           console.error('[ItemsSync] Sync error:', error);
+          console.error('[ItemsSync] Error details:', {
+            type: typeof error,
+            keys: Object.keys(error || {}),
+            message: (error as any)?.message,
+            full: JSON.stringify(error, null, 2)
+          });
+          
           clearTimeout(syncTimeout);
           
           const errStr = (error as any)?.message ?? String(error);
-          const anyStatus = (error as any)?.status ?? (error as any)?.response?.status ?? null;
+          const errorObj = error as any;
+          
+          const anyStatus = errorObj?.status ?? 
+                           errorObj?.response?.status ?? 
+                           errorObj?.statusCode;
+          
+          const errorMessage = errStr.toLowerCase();
           const is409 = anyStatus === 409 || 
-                       String(error).includes('409') || 
-                       String(error).toLowerCase().includes('must-refetch');
+                       anyStatus === '409' ||
+                       errorMessage.includes('409') || 
+                       errorMessage.includes('conflict') ||
+                       errorMessage.includes('must-refetch') ||
+                       errorMessage.includes('expired');
+
+          console.log('[ItemsSync] Error analysis:', { anyStatus, is409, errorMessage });
 
           if (is409) {
-            console.warn('[ItemsSync] Detected 409/must-refetch, resetting local DB');
+            console.warn('[ItemsSync] Detected 409 - clearing local cache');
             await clearLocalDB();
+            await new Promise(r => setTimeout(r, 100));
             window.location.reload();
           } else {
             setError(errStr);
             isSyncing = false;
+            setLoading(false);
           }
         },
       });
@@ -195,23 +335,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         completeSyncFlow();
       }
 
-      // Helper to complete sync flow
-      function completeSyncFlow() {
-        if (syncCompleted) return;
-        
-        syncCompleted = true;
-        isSyncing = false;
-        setLoading(false);
-        setError(null);
-        
-        refreshItems().catch(err => 
-          console.warn('[ItemsSync] Refresh after sync failed:', err)
-        );
-        
-        syncCompletionCallbacks.forEach(cb => cb());
-        syncCompletionCallbacks = [];
-      }
-
     } catch (err) {
       console.error('[ItemsSync] Initialization failed:', err);
       isSyncing = false;
@@ -219,100 +342,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       setError((err as Error).message ?? String(err));
     }
   }, [refreshItems]);
-
-  // Ensure local DB is fresh compared to server
-  async function ensureLocalIsFresh(pgInstance: any) {
-    try {
-      // Use direct fetch with proper query format
-      const probeUrl = `${window.location.origin}/v1/shape?table=items&offset=-1&limit=1`;
-      const resp = await fetch(probeUrl);
-      if (!resp.ok) {
-        console.log('[ItemsSync] Server probe failed:', resp.status);
-        return;
-      }
-
-      const contentType = resp.headers.get('content-type') || '';
-      let rows: any[] = [];
-
-      if (contentType.includes('application/json')) {
-        const json = await resp.json();
-        rows = Array.isArray(json) ? json : (json?.rows ?? []);
-      } else {
-        // Handle NDJSON (most common for Electric)
-        const text = await resp.text();
-        rows = text.trim().split('\n').filter(Boolean).map(line => {
-          try {
-            const parsed = JSON.parse(line);
-            // Electric NDJSON format: {"offset":"x","value":{...}}
-            return parsed?.value ?? parsed;
-          } catch {
-            return null;
-          }
-        }).filter(Boolean);
-      }
-
-      console.log('[ItemsSync] Server probe:', { contentType, rowCount: rows.length, sample: rows[0] });
-      if (!rows.length) return;
-
-      const serverRow = rows[rows.length - 1];
-      const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
-      if (!serverIso) {
-        console.log('[ItemsSync] No timestamp in server row:', serverRow);
-        return;
-      }
-      
-      const serverMax = new Date(serverIso).getTime();
-
-      const localRes = await pgInstance.query(
-        "SELECT max(COALESCE(published_at, created_at))::text AS max_date FROM items;"
-      );
-      const localIso = localRes?.rows?.[0]?.max_date ?? null;
-      const localMax = localIso ? new Date(localIso).getTime() : 0;
-
-      console.log('[ItemsSync] Timestamp comparison:', { 
-        serverIso, 
-        localIso, 
-        deltaMs: serverMax - localMax 
-      });
-
-      // If server is newer by >60s, reset local DB
-      if (serverMax - localMax > 60_000) {
-        console.warn('[ItemsSync] Server has newer data, resetting (delta ms):', serverMax - localMax);
-        await clearLocalDB();
-        window.location.reload();
-      }
-    } catch (err) {
-      console.warn('[ItemsSync] ensureLocalIsFresh error (ignored):', err);
-    }
-  }
-
-  // Clear IndexedDB databases
-  async function clearLocalDB() {
-    try {
-      if ((indexedDB as any)?.databases) {
-        const dbs = await (indexedDB as any).databases();
-        await Promise.all(dbs.map((d: any) => {
-          const name: string = d.name ?? '';
-          if (/pglite|electric|aidashboard/i.test(name)) {
-            return new Promise<void>((resolve) => {
-              const req = indexedDB.deleteDatabase(name);
-              req.onsuccess = () => resolve();
-              req.onerror = () => resolve();
-              req.onblocked = () => resolve();
-            });
-          }
-          return Promise.resolve();
-        }));
-      } else {
-        await Promise.all([
-          new Promise<void>(r => { const rq = indexedDB.deleteDatabase('pglite'); rq.onsuccess = r; rq.onerror = r; }),
-          new Promise<void>(r => { const rq = indexedDB.deleteDatabase('electric'); rq.onsuccess = r; rq.onerror = r; }),
-        ]);
-      }
-    } catch (err) {
-      console.warn('[ItemsSync] Error deleting IndexedDB:', err);
-    }
-  }
 
   useEffect(() => {
     initializeSync();
