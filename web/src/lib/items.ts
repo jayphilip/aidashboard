@@ -62,7 +62,7 @@ export async function getRecentItems(
       .select()
       .from(items)
       .where(sql`COALESCE(${items.publishedAt}, ${items.createdAt}) >= ${cutoff}`)
-      .orderBy(desc(items.publishedAt));
+      .orderBy(desc(sql`COALESCE(${items.publishedAt}, ${items.createdAt})`));
 
     if (limit && limit > 0) qb = qb.limit(limit);
     if (offset && offset > 0) qb = qb.offset(offset);
