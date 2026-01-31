@@ -104,34 +104,56 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         }
       }, 10000);
 
-      // Start sync with corrected URL format
+      // CRITICAL: Use absolute URL with proper origin
+      const baseUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/v1/shape`
+        : '/v1/shape';
+
+      console.log('[ItemsSync] Using base URL:', baseUrl);
+
+      // Start sync - library will append ?table=xxx&offset=xxx
       const syncResult = await (pg as any).electric.syncShapesToTables({
         key: 'items-sync',
         shapes: {
           items: {
             shape: {
-              url: `/v1/shape?table=items&offset=-1&where=published_at>='${cutoffIso}'`,
+              url: baseUrl,
+              params: {
+                table: 'items',
+                // Note: offset is handled automatically by library
+                // where clause syntax depends on Electric version
+                where: `published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`,
+              },
             },
             table: 'items',
             primaryKey: ['id'],
           },
           sources: {
             shape: {
-              url: '/v1/shape?table=sources&offset=-1',
+              url: baseUrl,
+              params: {
+                table: 'sources',
+              },
             },
             table: 'sources',
             primaryKey: ['id'],
           },
           item_topics: {
             shape: {
-              url: '/v1/shape?table=item_topics&offset=-1',
+              url: baseUrl,
+              params: {
+                table: 'item_topics',
+              },
             },
             table: 'item_topics',
             primaryKey: ['id'],
           },
           item_likes: {
             shape: {
-              url: '/v1/shape?table=item_likes&offset=-1',
+              url: baseUrl,
+              params: {
+                table: 'item_likes',
+              },
             },
             table: 'item_likes',
             primaryKey: ['id'],
@@ -201,9 +223,13 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   // Ensure local DB is fresh compared to server
   async function ensureLocalIsFresh(pgInstance: any) {
     try {
-      const probeUrl = '/v1/shape?table=items&offset=-1&limit=1';
+      // Use direct fetch with proper query format
+      const probeUrl = `${window.location.origin}/v1/shape?table=items&offset=-1&limit=1`;
       const resp = await fetch(probeUrl);
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        console.log('[ItemsSync] Server probe failed:', resp.status);
+        return;
+      }
 
       const contentType = resp.headers.get('content-type') || '';
       let rows: any[] = [];
@@ -212,11 +238,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         const json = await resp.json();
         rows = Array.isArray(json) ? json : (json?.rows ?? []);
       } else {
-        // Handle NDJSON
+        // Handle NDJSON (most common for Electric)
         const text = await resp.text();
         rows = text.trim().split('\n').filter(Boolean).map(line => {
           try {
             const parsed = JSON.parse(line);
+            // Electric NDJSON format: {"offset":"x","value":{...}}
             return parsed?.value ?? parsed;
           } catch {
             return null;
@@ -224,12 +251,15 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         }).filter(Boolean);
       }
 
-      console.log('[ItemsSync] Server probe:', { contentType, rowCount: rows.length });
+      console.log('[ItemsSync] Server probe:', { contentType, rowCount: rows.length, sample: rows[0] });
       if (!rows.length) return;
 
       const serverRow = rows[rows.length - 1];
       const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
-      if (!serverIso) return;
+      if (!serverIso) {
+        console.log('[ItemsSync] No timestamp in server row:', serverRow);
+        return;
+      }
       
       const serverMax = new Date(serverIso).getTime();
 
@@ -238,6 +268,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       );
       const localIso = localRes?.rows?.[0]?.max_date ?? null;
       const localMax = localIso ? new Date(localIso).getTime() : 0;
+
+      console.log('[ItemsSync] Timestamp comparison:', { 
+        serverIso, 
+        localIso, 
+        deltaMs: serverMax - localMax 
+      });
 
       // If server is newer by >60s, reset local DB
       if (serverMax - localMax > 60_000) {
