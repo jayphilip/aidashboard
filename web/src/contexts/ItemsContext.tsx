@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { getPGlite, getDb } from '@/lib/db';
 import { getAllItems, type Item } from '@/lib/items';
 import { logger } from '@/utils/logger';
+import { ShapeStream } from '@electric-sql/client';
 
 interface ItemsState {
   loading: boolean;
@@ -16,8 +17,6 @@ interface ItemsContextType extends ItemsState {
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
 
-let shapeSubscriptions: { [key: string]: { unsubscribe: () => void } } = {};
-let isSyncing = false;
 let syncCompleted = false;
 let syncCompletionCallbacks: (() => void)[] = [];
 
@@ -28,14 +27,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     error: null,
     items: [],
   });
-
-  const setLoading = (loading: boolean) => {
-    setState(prev => ({ ...prev, loading }));
-  };
-
-  const setError = (error: string | null) => {
-    setState(prev => ({ ...prev, error, loading: false }));
-  };
 
   const refreshItems = useCallback(async () => {
     try {
@@ -51,294 +42,166 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     if (syncCompleted) {
       return Promise.resolve();
     }
-
     return new Promise(resolve => {
       syncCompletionCallbacks.push(resolve);
     });
   }, []);
 
-  // Clear IndexedDB databases
-  const clearLocalDB = async () => {
-    try {
-      if ((indexedDB as any)?.databases) {
-        const dbs = await (indexedDB as any).databases();
-        await Promise.all(dbs.map((d: any) => {
-          const name: string = d.name ?? '';
-          if (/pglite|electric|aidashboard/i.test(name)) {
-            return new Promise<void>((resolve) => {
-              const req = indexedDB.deleteDatabase(name);
-              req.onsuccess = () => resolve();
-              req.onerror = () => resolve();
-              req.onblocked = () => resolve();
-            });
-          }
-          return Promise.resolve();
-        }));
-      } else {
-        await Promise.all([
-          new Promise<void>(r => { const rq = indexedDB.deleteDatabase('pglite'); rq.onsuccess = r; rq.onerror = r; }),
-          new Promise<void>(r => { const rq = indexedDB.deleteDatabase('electric'); rq.onsuccess = r; rq.onerror = r; }),
-        ]);
-      }
-      console.log('[ItemsSync] IndexedDB cleared');
-    } catch (err) {
-      console.warn('[ItemsSync] Error deleting IndexedDB:', err);
-    }
-  };
-
-  // Ensure local DB is fresh compared to server
-  const ensureLocalIsFresh = async (pgInstance: any) => {
-  // Check if we just cleared DB in last 5 seconds
-  const lastClear = localStorage.getItem('sync-last-clear');
-  const now = Date.now();
-  
-  if (lastClear && now - parseInt(lastClear) < 5000) {
-    console.log('[ItemsSync] Skipping freshness check (recently cleared)');
-    localStorage.removeItem('sync-last-clear');
-    return;
-  }
-
-  try {
-    const probeUrl = `${window.location.origin}/v1/shape?table=items&offset=-1`;
-    console.log('[ItemsSync] Probing:', probeUrl);
-    
-    const resp = await fetch(probeUrl);
-    if (!resp.ok) {
-      console.log('[ItemsSync] Server probe failed:', resp.status);
-      return;
-    }
-
-    const data = await resp.json();
-    
-    if (!Array.isArray(data) || data.length === 0) {
-      console.log('[ItemsSync] No data in response');
-      return;
-    }
-
-    const rows = data.map((item: any) => item.value).filter(Boolean);
-    
-    if (rows.length === 0) {
-      console.log('[ItemsSync] No valid rows parsed');
-      return;
-    }
-
-    const serverRow = rows[rows.length - 1];
-    const serverIso = serverRow?.published_at ?? serverRow?.created_at ?? null;
-    
-    if (!serverIso) {
-      console.log('[ItemsSync] No timestamp in server row');
-      return;
-    }
-    
-    const serverMax = new Date(serverIso).getTime();
-
-    // Check if items table exists and has data
-    let localMax = 0;
-    try {
-      const localRes = await pgInstance.query(
-        "SELECT max(COALESCE(published_at, created_at))::text AS max_date FROM items;"
-      );
-      const localIso = localRes?.rows?.[0]?.max_date ?? null;
-      localMax = localIso ? new Date(localIso).getTime() : 0;
-    } catch (e) {
-      console.log('[ItemsSync] Could not query local items table:', e);
-      return; // Table doesn't exist yet, skip check
-    }
-
-    console.log('[ItemsSync] Timestamp comparison:', { 
-      serverIso, 
-      localMax,
-      deltaMs: serverMax - localMax,
-      deltaHours: ((serverMax - localMax) / 3600000).toFixed(1)
-    });
-
-    // Only reset if local DB has data but is stale (>1 hour old)
-    if (localMax > 0 && serverMax - localMax > 3600_000) {
-      console.warn('[ItemsSync] Server significantly newer, resetting');
-      localStorage.setItem('sync-last-clear', now.toString());
-      await clearLocalDB();
-      window.location.reload();
-    } else {
-      console.log('[ItemsSync] Local DB acceptable or empty (will sync)');
-    }
-    
-  } catch (err) {
-    console.error('[ItemsSync] ensureLocalIsFresh error:', err);
-  }
-};
-
-
   const initializeSync = useCallback(async () => {
     if (hasInitialized.current) {
-      console.log('[ItemsSync] Already initialized, skipping');
-      return;
-    }
-    if (isSyncing) {
-      console.log('[ItemsSync] Already syncing, skipping');
-      return;
-    }
-    if (syncCompleted) {
-      console.log('[ItemsSync] Sync already completed, skipping');
+      console.log('[ItemsSync] Already initialized');
       return;
     }
 
     hasInitialized.current = true;
-    isSyncing = true;
-    setError(null);
 
     try {
-      const t0 = performance.now();
-      console.log('[ItemsSync] Initializing sync...');
-
+      console.log('[ItemsSync] Initializing...');
       const pg = await getPGlite();
-      console.log(`[ItemsSync] PGlite initialized in ${(performance.now() - t0).toFixed(0)}ms`);
+      await getDb(); // Create schema
+      
+      const baseUrl = `${window.location.origin}/v1/shape`;
+      const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Initialize database schema BEFORE starting sync
-      await getDb();
-      console.log(`[ItemsSync] Database schema ready in ${(performance.now() - t0).toFixed(0)}ms`);
+      let completedShapes = 0;
+      const totalShapes = 4;
 
-      // Ensure local DB isn't stale
-      await ensureLocalIsFresh(pg);
-
-      // Calculate 7-day cutoff
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      sevenDaysAgo.setUTCHours(0, 0, 0, 0);
-      const cutoffIso = sevenDaysAgo.toISOString();
-
-      console.log('[ItemsSync] Starting multi-table sync');
-
-      // Timeout fallback to prevent infinite spinner
       const syncTimeout = setTimeout(() => {
-        if (!syncCompleted) {
-          console.warn('[ItemsSync] Sync timeout reached, unblocking UI');
-          completeSyncFlow();
-        }
-      }, 15000); // Increased to 15s for initial load
+        console.warn('[ItemsSync] Timeout reached');
+        completeSyncFlow();
+      }, 20000);
 
-      // Use absolute URL with proper origin
-      const baseUrl = typeof window !== 'undefined'
-        ? `${window.location.origin}/v1/shape`
-        : '/v1/shape';
-
-      console.log('[ItemsSync] Using base URL:', baseUrl);
-
-      // Helper to complete sync flow
       function completeSyncFlow() {
         if (syncCompleted) return;
-        
-        console.log('[ItemsSync] Completing sync flow');
+        console.log('[ItemsSync] ✅ Sync complete');
         syncCompleted = true;
-        isSyncing = false;
-        setLoading(false);
-        setError(null);
-        
-        refreshItems().catch(err => 
-          console.warn('[ItemsSync] Refresh after sync failed:', err)
-        );
-        
+        setState(prev => ({ ...prev, loading: false, error: null }));
+        refreshItems();
         syncCompletionCallbacks.forEach(cb => cb());
         syncCompletionCallbacks = [];
       }
 
-      // Start sync
-const syncResult = await (pg as any).electric.syncShapesToTables({
-  // COMMENTED OUT - will re-enable after confirming it works
-  // key: 'items-sync',
-  
-  shapes: {
-    items: {
-      shape: {
-        url: baseUrl,
-        params: {
-          table: 'items',
-          where: `published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`,
-        },
-      },
-      table: 'items',
-      primaryKey: ['id'],
-    },
-    sources: {
-      shape: {
-        url: baseUrl,
-        params: {
-          table: 'sources',
-        },
-      },
-      table: 'sources',
-      primaryKey: ['id'],
-    },
-    item_topics: {
-      shape: {
-        url: baseUrl,
-        params: {
-          table: 'item_topics',
-        },
-      },
-      table: 'item_topics',
-      primaryKey: ['id'],
-    },
-    item_likes: {
-      shape: {
-        url: baseUrl,
-        params: {
-          table: 'item_likes',
-        },
-      },
-      table: 'item_likes',
-      primaryKey: ['id'],
-    },
-  },
-  onInitialSync: () => {
-    console.log('[ItemsSync] ✅ Initial sync complete!');
-    clearTimeout(syncTimeout);
-    completeSyncFlow();
-  },
-  onError: async (error: unknown) => {
-    console.error('[ItemsSync] ❌ Sync error:', error);
-    console.error('[ItemsSync] Error details:', JSON.stringify(error, null, 2));
-    
-    clearTimeout(syncTimeout);
-    setError(String(error));
-    isSyncing = false;
-    setLoading(false);
-  },
-});
-
-
-      console.log('[ItemsSync] Shapes subscribed successfully');
-      shapeSubscriptions['all'] = syncResult;
-
-      // Check if already up-to-date (resumed from cache)
-      if (syncResult?.isUpToDate) {
-        console.log('[ItemsSync] Already up-to-date (resumed from cache)');
-        clearTimeout(syncTimeout);
-        completeSyncFlow();
+      function onShapeComplete(shapeName: string) {
+        completedShapes++;
+        console.log(`[ItemsSync] ${shapeName} synced (${completedShapes}/${totalShapes})`);
+        if (completedShapes === totalShapes) {
+          clearTimeout(syncTimeout);
+          completeSyncFlow();
+        }
       }
 
+      // Sync items with where clause
+      const itemsStream = new ShapeStream({
+        url: `${baseUrl}?table=items&where=${encodeURIComponent(`published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`)}`,
+      });
+
+      itemsStream.subscribe(async (messages) => {
+        for (const message of messages) {
+          if (message.headers?.control === 'up-to-date') {
+            onShapeComplete('items');
+            return;
+          }
+          
+          // Apply inserts/updates/deletes to PGlite
+          if (message.value) {
+            const data = message.value;
+            await pg.query(
+              `INSERT INTO items (${Object.keys(data).join(',')}) 
+               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
+               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
+              Object.values(data)
+            );
+          }
+        }
+      });
+
+      // Sync sources
+      const sourcesStream = new ShapeStream({
+        url: `${baseUrl}?table=sources`,
+      });
+
+      sourcesStream.subscribe(async (messages) => {
+        for (const message of messages) {
+          if (message.headers?.control === 'up-to-date') {
+            onShapeComplete('sources');
+            return;
+          }
+          if (message.value) {
+            const data = message.value;
+            await pg.query(
+              `INSERT INTO sources (${Object.keys(data).join(',')}) 
+               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
+               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
+              Object.values(data)
+            );
+          }
+        }
+      });
+
+      // Sync item_topics
+      const topicsStream = new ShapeStream({
+        url: `${baseUrl}?table=item_topics`,
+      });
+
+      topicsStream.subscribe(async (messages) => {
+        for (const message of messages) {
+          if (message.headers?.control === 'up-to-date') {
+            onShapeComplete('item_topics');
+            return;
+          }
+          if (message.value) {
+            const data = message.value;
+            await pg.query(
+              `INSERT INTO item_topics (${Object.keys(data).join(',')}) 
+               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
+               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
+              Object.values(data)
+            );
+          }
+        }
+      });
+
+      // Sync item_likes
+      const likesStream = new ShapeStream({
+        url: `${baseUrl}?table=item_likes`,
+      });
+
+      likesStream.subscribe(async (messages) => {
+        for (const message of messages) {
+          if (message.headers?.control === 'up-to-date') {
+            onShapeComplete('item_likes');
+            return;
+          }
+          if (message.value) {
+            const data = message.value;
+            await pg.query(
+              `INSERT INTO item_likes (${Object.keys(data).join(',')}) 
+               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
+               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
+              Object.values(data)
+            );
+          }
+        }
+      });
+
+      console.log('[ItemsSync] All streams subscribed');
+
     } catch (err) {
-      console.error('[ItemsSync] Initialization failed:', err);
-      isSyncing = false;
-      setLoading(false);
-      setError((err as Error).message ?? String(err));
+      console.error('[ItemsSync] Init failed:', err);
+      setState(prev => ({ 
+        ...prev, 
+        loading: false, 
+        error: (err as Error).message 
+      }));
     }
   }, [refreshItems]);
 
   useEffect(() => {
     initializeSync();
-
-    return () => {
-      console.log('[ItemsSync] Component unmounting (keeping sync state)');
-    };
   }, [initializeSync]);
 
   return (
-    <ItemsContext.Provider
-      value={{
-        ...state,
-        refreshItems,
-        waitForSync,
-      }}
-    >
+    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync }}>
       {children}
     </ItemsContext.Provider>
   );
