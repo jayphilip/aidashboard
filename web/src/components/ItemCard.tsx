@@ -225,9 +225,28 @@ export default function ItemCard({ item }: ItemCardProps) {
 
         {/* Summary */}
         {item.summary && (
-          <Text fontSize="sm" lineHeight="1.6" color="gray.300">
+          <Text fontSize="sm" lineHeight="1.6" color="gray.300" mb={3}>
             {excerpt(item.summary, 150)}
           </Text>
+        )}
+
+        {/* Topics */}
+        {item.topics && item.topics.length > 0 && (
+          <Flex gap={1.5} flexWrap="wrap">
+            {item.topics.map(topic => (
+              <Badge
+                key={topic}
+                colorScheme="purple"
+                variant="subtle"
+                fontSize="xs"
+                px={2}
+                py={0.5}
+                rounded="md"
+              >
+                {topic}
+              </Badge>
+            ))}
+          </Flex>
         )}
       </Box>
 

@@ -64,7 +64,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
       let completedShapes = new Set<string>();
-      const totalShapes = 4;
+      const totalShapes = 3; // items, sources, item_likes only (removed item_topics)
       const BATCH_SIZE = 1000;
 
       const syncTimeout = setTimeout(() => {
@@ -192,7 +192,82 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
           
           if (message.value) {
             itemCount++;
-            itemBatch.push(message.value);
+            
+            const itemData = { ...message.value };
+            
+            // Convert source_id from string to integer
+            if (itemData.source_id) {
+              itemData.source_id = parseInt(itemData.source_id, 10);
+            }
+            
+            // Parse topics array from PostgreSQL format
+            if (itemData.topics) {
+              if (typeof itemData.topics === 'string') {
+                // Handle PostgreSQL array format: "{topic1,topic2}" or with quotes: "{\"topic one\",\"topic two\"}"
+                try {
+                  // Remove outer braces
+                  let arrayContent = itemData.topics.replace(/^\{|\}$/g, '');
+                  
+                  if (arrayContent === '') {
+                    itemData.topics = [];
+                  } else {
+                    // Parse PostgreSQL array format properly
+                    // Handle both simple format {a,b,c} and quoted format {"a","b","c"}
+                    const topics: string[] = [];
+                    let current = '';
+                    let inQuotes = false;
+                    let escaped = false;
+                    
+                    for (let i = 0; i < arrayContent.length; i++) {
+                      const char = arrayContent[i];
+                      
+                      if (escaped) {
+                        current += char;
+                        escaped = false;
+                      } else if (char === '\\') {
+                        escaped = true;
+                      } else if (char === '"') {
+                        inQuotes = !inQuotes;
+                      } else if (char === ',' && !inQuotes) {
+                        if (current.trim()) {
+                          topics.push(current.trim());
+                        }
+                        current = '';
+                      } else {
+                        current += char;
+                      }
+                    }
+                    
+                    // Don't forget the last item
+                    if (current.trim()) {
+                      topics.push(current.trim());
+                    }
+                    
+                    itemData.topics = topics;
+                  }
+                } catch (err) {
+                  console.warn('[ItemsSync] Failed to parse topics array:', err);
+                  itemData.topics = [];
+                }
+              } else if (!Array.isArray(itemData.topics)) {
+                // Fallback: ensure its an array
+                itemData.topics = [];
+              }
+            } else {
+              itemData.topics = [];
+            }
+            
+            // Validate required fields
+            if (!itemData.id || !itemData.title || !itemData.url) {
+              console.warn('[ItemsSync] Missing required fields, skipping item:', {
+                id: itemData.id,
+                title: itemData.title,
+                url: itemData.url
+              });
+              continue;
+            }
+            
+            itemBatch.push(itemData);
             
             if (itemCount % 100 === 0) {
               console.log(`[ItemsSync] items: Processed ${itemCount}...`);
@@ -234,38 +309,6 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             if (sourcesBatch.length >= BATCH_SIZE) {
               await flushBatch('sources', sourcesBatch, pg);
               sourcesBatch = [];
-            }
-          }
-        }
-      });
-
-      // Sync item_topics with batching
-      let topicsBatch: any[] = [];
-      let topicsCount = 0;
-      
-      const topicsStream = new ShapeStream({
-        url: `${baseUrl}?table=item_topics`,
-      });
-
-      topicsStream.subscribe(async (messages) => {
-        for (const message of messages) {
-          if (message.headers?.control === 'up-to-date') {
-            if (topicsBatch.length > 0) {
-              await flushBatch('item_topics', topicsBatch, pg);
-              topicsBatch = [];
-            }
-            console.log(`[ItemsSync] item_topics complete - ${topicsCount} total`);
-            onShapeComplete('item_topics');
-            return;
-          }
-          
-          if (message.value) {
-            topicsCount++;
-            topicsBatch.push(message.value);
-            
-            if (topicsBatch.length >= BATCH_SIZE) {
-              await flushBatch('item_topics', topicsBatch, pg);
-              topicsBatch = [];
             }
           }
         }

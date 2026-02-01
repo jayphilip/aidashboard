@@ -72,6 +72,7 @@ export function getDb() {
           body TEXT,
           published_at TIMESTAMPTZ NOT NULL,
           raw_metadata JSONB DEFAULT '{}'::JSONB,
+          topics TEXT[] DEFAULT '{}',
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
@@ -99,6 +100,7 @@ export function getDb() {
         CREATE INDEX IF NOT EXISTS idx_items_published_at ON items(published_at DESC);
         CREATE INDEX IF NOT EXISTS idx_items_source_type ON items(source_type);
         CREATE INDEX IF NOT EXISTS idx_items_url ON items(url);
+        CREATE INDEX IF NOT EXISTS idx_items_topics_gin ON items USING GIN(topics);
         CREATE INDEX IF NOT EXISTS idx_item_topics_item_id ON item_topics(item_id);
         CREATE INDEX IF NOT EXISTS idx_item_topics_topic ON item_topics(topic);
         CREATE INDEX IF NOT EXISTS idx_item_likes_user_id ON item_likes(user_id);

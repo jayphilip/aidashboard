@@ -74,6 +74,7 @@ export const items = pgTable('items', {
   body: text('body'),
   publishedAt: timestamp('published_at', { mode: 'date' }).notNull(),
   rawMetadata: jsonb('raw_metadata').$type<ItemRawMetadata>().default({} as any),
+  topics: text('topics').array().default([]),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
 });

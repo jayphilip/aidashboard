@@ -76,20 +76,25 @@ export async function getRecentItems(
 }
 
 /**
- * Get items with topics by filtering through item_topics
+ * Get items by topics (using array column)
  */
-export async function getItemsWithTopics(topics: string[]): Promise<Item[]> {
-  const db = await getDb();
-
-  const rows = await db
-    .select({ item: items })
-    .from(items)
-    .innerJoin(itemTopics, eq(items.id, itemTopics.itemId))
-    .where(inArray(itemTopics.topic, topics))
-    .groupBy(items.id)
-    .orderBy(desc(items.publishedAt));
-
-  return rows.map(r => r.item);
+export async function getItemsByTopics(topics: string[]): Promise<Item[]> {
+  try {
+    const pg = await getPGlite();
+    
+    // Use PostgreSQL array overlap operator (&&)
+    const result = await pg.query(`
+      SELECT *
+      FROM items
+      WHERE topics && $1
+      ORDER BY COALESCE(published_at, created_at) DESC
+    `, [topics]);
+    
+    return result.rows;
+  } catch (err) {
+    logger.warn('Failed to get items by topics:', err);
+    return [];
+  }
 }
 
 /**
@@ -148,39 +153,28 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
 
   // Filter by topics and/or likes (may require joins)
   let rows: Item[] = [];
-  const needsTopicJoin = topics && topics.length > 0;
+  const needsTopicFilter = topics && topics.length > 0;
   const needsLikeJoin = likeStatus !== null && likeStatus !== undefined;
 
-  if (needsTopicJoin || needsLikeJoin) {
-    let qb: any = db.select({ item: items });
+  if (needsTopicFilter) {
+    // Add topic condition using array operator
+    conditions.push(sql`${items.topics} && ${topics}`);
+  }
 
-    if (needsTopicJoin) {
-      qb = qb.from(items).innerJoin(itemTopics, eq(items.id, itemTopics.itemId));
-    } else if (needsLikeJoin) {
-      // Left join for likes so we can filter by missing entries
-      qb = qb.from(items).leftJoin(itemLikes, and(eq(items.id, itemLikes.itemId), eq(itemLikes.userId, userId)));
-    } else {
-      qb = qb.from(items);
-    }
+  if (needsLikeJoin) {
+    let qb: any = db.select({ item: items }).from(items).leftJoin(itemLikes, and(eq(items.id, itemLikes.itemId), eq(itemLikes.userId, userId)));
 
     // Build filter conditions
     let allConditions = [...conditions];
 
-    // Add topic condition if needed
-    if (needsTopicJoin) {
-      allConditions.push(inArray(itemTopics.topic, topics!));
-    }
-
     // Add like status condition if needed
-    if (needsLikeJoin) {
-      if (likeStatus === 'liked') {
-        allConditions.push(eq(itemLikes.score, 1));
-      } else if (likeStatus === 'disliked') {
-        allConditions.push(eq(itemLikes.score, -1));
-      } else if (likeStatus === 'unrated') {
-        // For unrated items, check if the join resulted in NULL (no like entry for this user)
-        allConditions.push(isNull(itemLikes.id));
-      }
+    if (likeStatus === 'liked') {
+      allConditions.push(eq(itemLikes.score, 1));
+    } else if (likeStatus === 'disliked') {
+      allConditions.push(eq(itemLikes.score, -1));
+    } else if (likeStatus === 'unrated') {
+      // For unrated items, check if the join resulted in NULL (no like entry for this user)
+      allConditions.push(isNull(itemLikes.id));
     }
 
     // Apply conditions
@@ -193,7 +187,7 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
     const results = await qb;
     rows = results.map((r: any) => r.item);
   } else {
-    // No topic or like filter, use regular query
+    // No like filter, use regular query
     let qb: any = db.select().from(items);
 
     // Apply all conditions with a single where() using and()
@@ -225,18 +219,21 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
 }
 
 /**
- * Get all unique topics from items
+ * Get all unique topics from items (using array column)
  */
 export async function getAllTopics(): Promise<string[]> {
   try {
-    const db = await getDb();
-    const results = await db
-      .select({ topic: itemTopics.topic })
-      .from(itemTopics)
-      .groupBy(itemTopics.topic)
-      .orderBy(itemTopics.topic);
-
-    return results.map(r => r.topic);
+    const pg = await getPGlite();
+    
+    // Use unnest to extract all unique topics from arrays
+    const result = await pg.query(`
+      SELECT DISTINCT unnest(topics) as topic
+      FROM items
+      WHERE topics IS NOT NULL AND array_length(topics, 1) > 0
+      ORDER BY topic
+    `);
+    
+    return result.rows.map(r => r.topic);
   } catch (err) {
     logger.warn('Failed to get topics:', err);
     return [];
