@@ -1,9 +1,9 @@
-# Build stage
-FROM rust:latest AS builder
+# Build stage - use slim image for faster builds
+FROM rust:1.83-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies
+# Install only essential build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     ca-certificates \
@@ -13,18 +13,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY Cargo.toml Cargo.lock ./
 COPY server/ingestor/Cargo.toml ./server/ingestor/
 
-# Create dummy source files to build dependencies
-RUN mkdir -p server/ingestor/src && \
-    echo "fn main() {}" > server/ingestor/src/main.rs
+# Create complete dummy source structure to cache dependencies
+RUN mkdir -p server/ingestor/src/sources && \
+    echo "fn main() {}" > server/ingestor/src/main.rs && \
+    echo "// dummy" > server/ingestor/src/config.rs && \
+    echo "// dummy" > server/ingestor/src/db.rs && \
+    echo "// dummy" > server/ingestor/src/models.rs && \
+    echo "// dummy" > server/ingestor/src/topics.rs && \
+    echo "// dummy" > server/ingestor/src/sources/mod.rs
 
-# Build dependencies (this layer will be cached)
-RUN cd server/ingestor && cargo build --release && \
-    rm -rf target/release/.fingerprint/ingestor-*
+# Build dependencies only (this layer will be cached unless Cargo.toml changes)
+RUN cd server/ingestor && \
+    cargo build --release 2>&1 || true && \
+    rm -rf target/release/.fingerprint/ingestor-* target/release/deps/ingestor-*
 
 # Now copy actual source code
 COPY server/ingestor/src ./server/ingestor/src/
 
-# Build the actual ingestor (only rebuilds if source changed)
+# Build the actual ingestor (fast because deps are cached)
 RUN cd server/ingestor && cargo build --release
 
 # Runtime stage
