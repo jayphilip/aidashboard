@@ -1,5 +1,5 @@
 # Build stage - use slim image for faster builds
-FROM rust:1.83-slim AS builder
+FROM rust:latest-slim AS builder
 
 WORKDIR /app
 
