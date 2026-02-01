@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
 import { Box, Container, Heading, Text, Flex, Spinner, Center, Grid } from '@chakra-ui/react';
 import { Newspaper, Mail, FileText, Twitter, AlertCircle } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
-import { getRecentItems } from '@/lib/items';
 import type { Item } from '@/lib/items';
 import ItemCard from '@/components/ItemCard';
 
@@ -21,38 +19,19 @@ const CONTENT_SECTIONS: ContentSection[] = [
 ];
 
 export default function TodayPage() {
-  const { loading: syncLoading, error: syncError, waitForSync } = useItems();
-  const [allItems, setAllItems] = useState<Item[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function loadItems() {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        await waitForSync();
-
-        // Get recent items from last 30 days
-        const items = await getRecentItems(720, 100, 0);
-        setAllItems(items);
-      } catch (err) {
-        console.error('Failed to load items:', err);
-        setError((err as Error)?.message ?? String(err));
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadItems();
-  }, [waitForSync]);
+  // Get items directly from context - already sorted by COALESCE(published_at, created_at) DESC
+  const { items: allItems, loading: syncLoading, error: syncError } = useItems();
 
   const getItemsByType = (type: string) => {
-    return allItems.filter(item => item.sourceType === type).slice(0, 6);
+    // Get last 30 days of items for this type
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    return allItems
+      .filter(item => {
+        const itemDate = item.publishedAt || item.createdAt;
+        return item.sourceType === type && itemDate >= thirtyDaysAgo;
+      })
+      .slice(0, 6);
   };
-
-  const showError = syncError || error;
 
   return (
     <Box minH="100vh" bg="gray.950" color="white">
@@ -104,7 +83,7 @@ export default function TodayPage() {
 
           <Container maxW="7xl" pb={12}>
             {/* Error message */}
-            {showError && (
+            {syncError && (
               <Box
                 bg="rgba(220, 38, 38, 0.1)"
                 borderWidth="1px"
@@ -120,25 +99,15 @@ export default function TodayPage() {
                       Error Loading Items
                     </Text>
                     <Text color="red.300" fontSize="sm">
-                      {showError}
+                      {syncError}
                     </Text>
                   </Box>
                 </Flex>
               </Box>
             )}
 
-            {/* Loading state */}
-            {isLoading && !showError && (
-              <Flex justify="center" py={16}>
-                <Flex direction="column" align="center" gap={3}>
-                  <Spinner size="lg" color="blue.400" borderWidth="3px" />
-                  <Text color="gray.500" fontSize="sm">Loading content...</Text>
-                </Flex>
-              </Flex>
-            )}
-
             {/* Content Sections */}
-            {!isLoading && !showError && (
+            {!syncError && (
               <Flex direction="column" gap={12}>
                 {CONTENT_SECTIONS.map((section) => {
                   const items = getItemsByType(section.type);
@@ -191,7 +160,7 @@ export default function TodayPage() {
                   );
                 })}
 
-                {/* Empty state - if no items at all */}
+                {/* Empty state */}
                 {allItems.length === 0 && (
                   <Box
                     bg="gray.900"
