@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 anyhow = "1"
-sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-native-tls", "chrono", "uuid", "migrate"] }
-reqwest = { version = "0.12", features = ["json"] }
+sqlx = { version = "0.8", features = ["postgres", "runtime-tokio-rustls", "chrono", "uuid", "migrate"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
@@ -18,3 +18,19 @@ dotenvy = "0.15"
 log = "0.4"
 env_logger = "0.11"
 urlencoding = "2"
+
+# Disable unused binary targets
+[[bin]]
+name = "ingestor"
+path = "src/main.rs"
+
+# Optimize build times
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

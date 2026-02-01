@@ -6,15 +6,25 @@ WORKDIR /app
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
-    libssl-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace and ingestor source
-COPY server/ ./server/
+# Copy workspace manifests first for better layer caching
 COPY Cargo.toml Cargo.lock ./
+COPY server/ingestor/Cargo.toml ./server/ingestor/
 
-# Build the ingestor
+# Create dummy source files to build dependencies
+RUN mkdir -p server/ingestor/src && \
+    echo "fn main() {}" > server/ingestor/src/main.rs
+
+# Build dependencies (this layer will be cached)
+RUN cd server/ingestor && cargo build --release && \
+    rm -rf target/release/.fingerprint/ingestor-*
+
+# Now copy actual source code
+COPY server/ingestor/src ./server/ingestor/src/
+
+# Build the actual ingestor (only rebuilds if source changed)
 RUN cd server/ingestor && cargo build --release
 
 # Runtime stage
@@ -22,9 +32,8 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies (rustls doesn't need libssl)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

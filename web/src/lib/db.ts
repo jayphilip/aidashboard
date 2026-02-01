@@ -3,12 +3,46 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { papers, sources, items, itemTopics, itemLikes } from './schema';
 
+// Schema version - increment when schema changes to force client DB reset
+const SCHEMA_VERSION = 2;
+
 // Singleton-style promises so we only initialise once per tab
 let pglitePromise: Promise<PGlite> | null = null;
 let dbPromise: Promise<ReturnType<typeof drizzle>> | null = null;
 
-export function getPGlite() {
+async function checkSchemaVersion(): Promise<boolean> {
+  const storedVersion = localStorage.getItem('aidashboard_schema_version');
+  const currentVersion = SCHEMA_VERSION.toString();
+  
+  if (storedVersion !== currentVersion) {
+    console.log(`[DB] Schema version mismatch (stored: ${storedVersion}, current: ${currentVersion}). Clearing database...`);
+    
+    // Clear IndexedDB
+    try {
+      const dbs = await indexedDB.databases();
+      for (const db of dbs) {
+        if (db.name && db.name.includes('aidashboard')) {
+          indexedDB.deleteDatabase(db.name);
+          console.log(`[DB] Deleted database: ${db.name}`);
+        }
+      }
+    } catch (err) {
+      console.warn('[DB] Failed to clear IndexedDB:', err);
+    }
+    
+    // Update version
+    localStorage.setItem('aidashboard_schema_version', currentVersion);
+    return true; // Database was cleared
+  }
+  
+  return false; // No changes needed
+}
+
+export async function getPGlite() {
   if (!pglitePromise) {
+    // Check and clear if needed before creating new instance
+    await checkSchemaVersion();
+    
     pglitePromise = PGlite.create({
       dataDir: 'idb://aidashboard',
       // No extensions needed - we'll use ShapeStream directly in ItemsContext

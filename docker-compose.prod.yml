@@ -39,6 +39,7 @@ services:
       AUTH_MODE: insecure
       ELECTRIC_INSECURE: "true"
       ELECTRIC_PUBLIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
+      SNAPSHOT_TIMEOUT_MS: "120000"
     depends_on:
       postgres:
         condition: service_healthy
