@@ -64,7 +64,7 @@ export function getDb() {
 
         CREATE TABLE IF NOT EXISTS items (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          source_id INTEGER NOT NULL,
+          source_id INTEGER,
           source_type TEXT NOT NULL CHECK (source_type IN ('paper', 'newsletter', 'blog', 'tweet')),
           title TEXT NOT NULL,
           url TEXT NOT NULL,
