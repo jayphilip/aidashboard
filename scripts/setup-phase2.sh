@@ -18,7 +18,8 @@ echo ""
 # Start services
 echo "📦 Starting PostgreSQL and Electric Sync..."
 cd infra
-docker-compose up -d
+# Use Docker Compose plugin ("docker compose") where available
+docker compose up -d
 
 echo "⏳ Waiting for PostgreSQL to be ready..."
 sleep 5
