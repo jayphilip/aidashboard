@@ -65,7 +65,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
       let completedShapes = new Set<string>();
       const totalShapes = 4;
-      const BATCH_SIZE = 100;
+      const BATCH_SIZE = 1000;
 
       const syncTimeout = setTimeout(() => {
         console.warn('[ItemsSync] Timeout reached');
