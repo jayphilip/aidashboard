@@ -63,7 +63,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const baseUrl = `${window.location.origin}/v1/shape`;
       const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      let completedShapes = 0;
+      let completedShapes = new Set<string>();
       const totalShapes = 4;
 
       const syncTimeout = setTimeout(() => {
@@ -81,14 +81,20 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         syncCompletionCallbacks = [];
       }
 
-      function onShapeComplete(shapeName: string) {
-        completedShapes++;
-        console.log(`[ItemsSync] ${shapeName} synced (${completedShapes}/${totalShapes})`);
-        if (completedShapes === totalShapes) {
-          clearTimeout(syncTimeout);
-          completeSyncFlow();
-        }
-      }
+function onShapeComplete(shapeName: string) {
+  if (completedShapes.has(shapeName)) {
+    console.log(`[ItemsSync] ${shapeName} already completed, skipping`);
+    return;
+  }
+  
+  completedShapes.add(shapeName);
+  console.log(`[ItemsSync] ${shapeName} synced (${completedShapes.size}/${totalShapes})`);
+  
+  if (completedShapes.size === totalShapes) {
+    clearTimeout(syncTimeout);
+    completeSyncFlow();
+  }
+}
 
       // Sync items with where clause
       const itemsStream = new ShapeStream({
