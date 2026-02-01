@@ -65,38 +65,114 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
       let completedShapes = new Set<string>();
       const totalShapes = 4;
+      const BATCH_SIZE = 100;
 
       const syncTimeout = setTimeout(() => {
         console.warn('[ItemsSync] Timeout reached');
         completeSyncFlow();
-      }, 20000);
+      }, 60000); // Increased to 60 seconds
 
       function completeSyncFlow() {
         if (syncCompleted) return;
         console.log('[ItemsSync] ✅ Sync complete');
+        
         syncCompleted = true;
         setState(prev => ({ ...prev, loading: false, error: null }));
+        
+        // Debug logging
+        (async () => {
+          try {
+            const result = await pg.query(`
+              SELECT 
+                MIN(published_at)::text as earliest,
+                MAX(published_at)::text as latest,
+                COUNT(*) as total
+              FROM items
+            `);
+            console.log('[ItemsSync] 📊 Local DB stats:', result.rows[0]);
+            
+            const recent = await pg.query(`
+              SELECT 
+                id, 
+                title, 
+                published_at::text, 
+                created_at::text
+              FROM items
+              ORDER BY COALESCE(published_at, created_at) DESC
+              LIMIT 5
+            `);
+            console.log('[ItemsSync] 📰 Most recent items:', recent.rows);
+          } catch (err) {
+            console.error('[ItemsSync] Debug query failed:', err);
+          }
+        })();
+        
         refreshItems();
         syncCompletionCallbacks.forEach(cb => cb());
         syncCompletionCallbacks = [];
       }
 
-function onShapeComplete(shapeName: string) {
-  if (completedShapes.has(shapeName)) {
-    console.log(`[ItemsSync] ${shapeName} already completed, skipping`);
-    return;
-  }
-  
-  completedShapes.add(shapeName);
-  console.log(`[ItemsSync] ${shapeName} synced (${completedShapes.size}/${totalShapes})`);
-  
-  if (completedShapes.size === totalShapes) {
-    clearTimeout(syncTimeout);
-    completeSyncFlow();
-  }
-}
+      function onShapeComplete(shapeName: string) {
+        if (completedShapes.has(shapeName)) {
+          console.log(`[ItemsSync] ${shapeName} already completed, skipping`);
+          return;
+        }
+        
+        completedShapes.add(shapeName);
+        console.log(`[ItemsSync] ${shapeName} synced (${completedShapes.size}/${totalShapes})`);
+        
+        if (completedShapes.size === totalShapes) {
+          clearTimeout(syncTimeout);
+          completeSyncFlow();
+        }
+      }
 
-      // Sync items with where clause
+      // Batch insert helper
+      async function flushBatch(tableName: string, batch: any[], pg: any) {
+        if (batch.length === 0) return;
+        
+        const columns = Object.keys(batch[0]);
+        const valuePlaceholders = batch.map((_, batchIdx) => 
+          `(${columns.map((_, colIdx) => `$${batchIdx * columns.length + colIdx + 1}`).join(',')})`
+        ).join(',');
+        
+        const allValues = batch.flatMap(item => Object.values(item));
+        const updates = columns.map(k => `${k} = EXCLUDED.${k}`).join(',');
+        
+        try {
+          await pg.query(
+            `INSERT INTO ${tableName} (${columns.join(',')}) 
+             VALUES ${valuePlaceholders}
+             ON CONFLICT (id) DO UPDATE SET ${updates}`,
+            allValues
+          );
+          console.log(`[ItemsSync] ${tableName}: Inserted batch of ${batch.length} rows`);
+        } catch (err) {
+          console.error(`[ItemsSync] ${tableName}: Batch insert failed:`, err);
+          // Fallback to individual inserts on batch failure
+          for (const item of batch) {
+            try {
+              const cols = Object.keys(item);
+              const vals = Object.values(item);
+              const placeholders = cols.map((_, i) => `$${i + 1}`).join(',');
+              const upd = cols.map(k => `${k} = EXCLUDED.${k}`).join(',');
+              await pg.query(
+                `INSERT INTO ${tableName} (${cols.join(',')}) 
+                 VALUES (${placeholders})
+                 ON CONFLICT (id) DO UPDATE SET ${upd}`,
+                vals
+              );
+            } catch (itemErr) {
+              console.error(`[ItemsSync] ${tableName}: Failed to insert single item:`, itemErr);
+            }
+          }
+        }
+      }
+
+      // Sync items with batching
+      let itemBatch: any[] = [];
+      let itemCount = 0;
+      
       const itemsStream = new ShapeStream({
         url: `${baseUrl}?table=items&where=${encodeURIComponent(`published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`)}`,
       });
@@ -104,24 +180,37 @@ function onShapeComplete(shapeName: string) {
       itemsStream.subscribe(async (messages) => {
         for (const message of messages) {
           if (message.headers?.control === 'up-to-date') {
+            // Flush remaining batch
+            if (itemBatch.length > 0) {
+              await flushBatch('items', itemBatch, pg);
+              itemBatch = [];
+            }
+            console.log(`[ItemsSync] items complete - ${itemCount} total`);
             onShapeComplete('items');
             return;
           }
           
-          // Apply inserts/updates/deletes to PGlite
           if (message.value) {
-            const data = message.value;
-            await pg.query(
-              `INSERT INTO items (${Object.keys(data).join(',')}) 
-               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
-               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
-              Object.values(data)
-            );
+            itemCount++;
+            itemBatch.push(message.value);
+            
+            if (itemCount % 100 === 0) {
+              console.log(`[ItemsSync] items: Processed ${itemCount}...`);
+            }
+            
+            // Flush batch when it reaches size limit
+            if (itemBatch.length >= BATCH_SIZE) {
+              await flushBatch('items', itemBatch, pg);
+              itemBatch = [];
+            }
           }
         }
       });
 
-      // Sync sources
+      // Sync sources with batching
+      let sourcesBatch: any[] = [];
+      let sourcesCount = 0;
+      
       const sourcesStream = new ShapeStream({
         url: `${baseUrl}?table=sources`,
       });
@@ -129,22 +218,31 @@ function onShapeComplete(shapeName: string) {
       sourcesStream.subscribe(async (messages) => {
         for (const message of messages) {
           if (message.headers?.control === 'up-to-date') {
+            if (sourcesBatch.length > 0) {
+              await flushBatch('sources', sourcesBatch, pg);
+              sourcesBatch = [];
+            }
+            console.log(`[ItemsSync] sources complete - ${sourcesCount} total`);
             onShapeComplete('sources');
             return;
           }
+          
           if (message.value) {
-            const data = message.value;
-            await pg.query(
-              `INSERT INTO sources (${Object.keys(data).join(',')}) 
-               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
-               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
-              Object.values(data)
-            );
+            sourcesCount++;
+            sourcesBatch.push(message.value);
+            
+            if (sourcesBatch.length >= BATCH_SIZE) {
+              await flushBatch('sources', sourcesBatch, pg);
+              sourcesBatch = [];
+            }
           }
         }
       });
 
-      // Sync item_topics
+      // Sync item_topics with batching
+      let topicsBatch: any[] = [];
+      let topicsCount = 0;
+      
       const topicsStream = new ShapeStream({
         url: `${baseUrl}?table=item_topics`,
       });
@@ -152,22 +250,31 @@ function onShapeComplete(shapeName: string) {
       topicsStream.subscribe(async (messages) => {
         for (const message of messages) {
           if (message.headers?.control === 'up-to-date') {
+            if (topicsBatch.length > 0) {
+              await flushBatch('item_topics', topicsBatch, pg);
+              topicsBatch = [];
+            }
+            console.log(`[ItemsSync] item_topics complete - ${topicsCount} total`);
             onShapeComplete('item_topics');
             return;
           }
+          
           if (message.value) {
-            const data = message.value;
-            await pg.query(
-              `INSERT INTO item_topics (${Object.keys(data).join(',')}) 
-               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
-               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
-              Object.values(data)
-            );
+            topicsCount++;
+            topicsBatch.push(message.value);
+            
+            if (topicsBatch.length >= BATCH_SIZE) {
+              await flushBatch('item_topics', topicsBatch, pg);
+              topicsBatch = [];
+            }
           }
         }
       });
 
-      // Sync item_likes
+      // Sync item_likes with batching
+      let likesBatch: any[] = [];
+      let likesCount = 0;
+      
       const likesStream = new ShapeStream({
         url: `${baseUrl}?table=item_likes`,
       });
@@ -175,17 +282,23 @@ function onShapeComplete(shapeName: string) {
       likesStream.subscribe(async (messages) => {
         for (const message of messages) {
           if (message.headers?.control === 'up-to-date') {
+            if (likesBatch.length > 0) {
+              await flushBatch('item_likes', likesBatch, pg);
+              likesBatch = [];
+            }
+            console.log(`[ItemsSync] item_likes complete - ${likesCount} total`);
             onShapeComplete('item_likes');
             return;
           }
+          
           if (message.value) {
-            const data = message.value;
-            await pg.query(
-              `INSERT INTO item_likes (${Object.keys(data).join(',')}) 
-               VALUES (${Object.keys(data).map((_, i) => `$${i + 1}`).join(',')})
-               ON CONFLICT (id) DO UPDATE SET ${Object.keys(data).map(k => `${k} = EXCLUDED.${k}`).join(',')}`,
-              Object.values(data)
-            );
+            likesCount++;
+            likesBatch.push(message.value);
+            
+            if (likesBatch.length >= BATCH_SIZE) {
+              await flushBatch('item_likes', likesBatch, pg);
+              likesBatch = [];
+            }
           }
         }
       });
