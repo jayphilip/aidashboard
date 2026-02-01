@@ -252,7 +252,7 @@ export async function getAllItems(): Promise<Item[]> {
     const rows = await db
       .select()
       .from(items)
-      .orderBy(desc(items.publishedAt));
+      .orderBy(sql`COALESCE(${items.publishedAt}, ${items.createdAt}) DESC`);
     return rows;
   } catch (err) {
     logger.warn('Failed to get all items:', err);
