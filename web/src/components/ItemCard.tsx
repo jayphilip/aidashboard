@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, memo } from 'react';
 import { Box, Flex, Text, Button, Badge } from '@chakra-ui/react';
 import { getDb } from '@/lib/db';
 import { itemLikes } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { useUser } from '@/contexts/UserContext';
-import { getSourceNameById } from '@/lib/sources';
 import { formatDate, excerpt } from '@/utils/formatting';
 import { logger } from '@/utils/logger';
 import { ExternalLink, ThumbsUp, ThumbsDown } from 'lucide-react';
@@ -12,6 +11,9 @@ import type { Item } from '@/lib/items';
 
 interface ItemCardProps {
   item: Item;
+  sourceName?: string;
+  initialLiked?: number | null;
+  onLikeChange?: () => void;
 }
 
 function getSourceIcon(sourceType: string): string {
@@ -59,40 +61,10 @@ function getSourceTypeColor(sourceType: string): string {
   }
 }
 
-export default function ItemCard({ item }: ItemCardProps) {
+const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialLiked = null, onLikeChange }: ItemCardProps) {
   const { userId } = useUser();
-  const [liked, setLiked] = useState<number | null>(null);
-  const [sourceName, setSourceName] = useState('Unknown');
+  const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    async function loadCardData() {
-      try {
-        // Get source name
-        const name = await getSourceNameById(item.sourceId);
-        setSourceName(name);
-
-        // Get like status
-        const db = await getDb();
-        const result = await db
-          .select()
-          .from(itemLikes)
-          .where(and(
-            eq(itemLikes.itemId, item.id),
-            eq(itemLikes.userId, userId)
-          ))
-          .limit(1);
-
-        if (result.length > 0) {
-          setLiked(result[0].score);
-        }
-      } catch (err) {
-        logger.error('Failed to load card data:', err);
-      }
-    }
-
-    loadCardData();
-  }, [item.id, item.sourceId, userId]);
 
   async function toggleLike(score: number) {
     if (loading) return;
@@ -142,6 +114,11 @@ export default function ItemCard({ item }: ItemCardProps) {
           createdAt: new Date(),
         } as any);
         setLiked(score);
+      }
+
+      // Notify parent to refresh likes
+      if (onLikeChange) {
+        onLikeChange();
       }
     } catch (err) {
       logger.error('Failed to toggle like:', err);
@@ -312,4 +289,6 @@ export default function ItemCard({ item }: ItemCardProps) {
       </Box>
     </Box>
   );
-}
+});
+
+export default ItemCard;

@@ -3,16 +3,22 @@ import { getPGlite, getDb } from '@/lib/db';
 import { getAllItems, type Item } from '@/lib/items';
 import { logger } from '@/utils/logger';
 import { ShapeStream } from '@electric-sql/client';
+import { sources, itemLikes } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
+import { useUser } from './UserContext';
 
 interface ItemsState {
   loading: boolean;
   error: string | null;
   items: Item[];
+  sourcesMap: Map<number, string>;
+  likesMap: Map<string, number | null>;
 }
 
 interface ItemsContextType extends ItemsState {
   refreshItems: () => Promise<void>;
   waitForSync: () => Promise<void>;
+  refreshLikes: () => Promise<void>;
 }
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
@@ -21,11 +27,14 @@ let syncCompleted = false;
 let syncCompletionCallbacks: (() => void)[] = [];
 
 export function ItemsProvider({ children }: { children: ReactNode }) {
+  const { userId } = useUser();
   const hasInitialized = useRef(false);
   const [state, setState] = useState<ItemsState>({
     loading: true,
     error: null,
     items: [],
+    sourcesMap: new Map(),
+    likesMap: new Map(),
   });
 
   const refreshItems = useCallback(async () => {
@@ -37,6 +46,41 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       setState(prev => ({ ...prev, items: [] }));
     }
   }, []);
+
+  const loadAuxiliaryData = useCallback(async () => {
+    try {
+      const db = await getDb();
+
+      // Load all sources into a map
+      const allSources = await db.select().from(sources);
+      const sourcesMap = new Map(allSources.map(s => [s.id, s.name]));
+
+      // Load all user likes into a map
+      const userLikes = await db
+        .select()
+        .from(itemLikes)
+        .where(eq(itemLikes.userId, userId));
+      const likesMap = new Map(userLikes.map(l => [l.itemId, l.score]));
+
+      setState(prev => ({ ...prev, sourcesMap, likesMap }));
+    } catch (err) {
+      logger.warn('Failed to load auxiliary data:', err);
+    }
+  }, [userId]);
+
+  const refreshLikes = useCallback(async () => {
+    try {
+      const db = await getDb();
+      const userLikes = await db
+        .select()
+        .from(itemLikes)
+        .where(eq(itemLikes.userId, userId));
+      const likesMap = new Map(userLikes.map(l => [l.itemId, l.score]));
+      setState(prev => ({ ...prev, likesMap }));
+    } catch (err) {
+      logger.warn('Failed to refresh likes:', err);
+    }
+  }, [userId]);
 
   const waitForSync = useCallback((): Promise<void> => {
     if (syncCompleted) {
@@ -75,27 +119,27 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       function completeSyncFlow() {
         if (syncCompleted) return;
         console.log('[ItemsSync] ✅ Sync complete');
-        
+
         syncCompleted = true;
         setState(prev => ({ ...prev, loading: false, error: null }));
-        
+
         // Debug logging
         (async () => {
           try {
             const result = await pg.query(`
-              SELECT 
+              SELECT
                 MIN(published_at)::text as earliest,
                 MAX(published_at)::text as latest,
                 COUNT(*) as total
               FROM items
             `);
             console.log('[ItemsSync] 📊 Local DB stats:', result.rows[0]);
-            
+
             const recent = await pg.query(`
-              SELECT 
-                id, 
-                title, 
-                published_at::text, 
+              SELECT
+                id,
+                title,
+                published_at::text,
                 created_at::text
               FROM items
               ORDER BY COALESCE(published_at, created_at) DESC
@@ -106,8 +150,9 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             console.error('[ItemsSync] Debug query failed:', err);
           }
         })();
-        
+
         refreshItems();
+        loadAuxiliaryData();
         syncCompletionCallbacks.forEach(cb => cb());
         syncCompletionCallbacks = [];
       }
@@ -350,20 +395,20 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
     } catch (err) {
       console.error('[ItemsSync] Init failed:', err);
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: (err as Error).message 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: (err as Error).message
       }));
     }
-  }, [refreshItems]);
+  }, [refreshItems, loadAuxiliaryData]);
 
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
 
   return (
-    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync }}>
+    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes }}>
       {children}
     </ItemsContext.Provider>
   );

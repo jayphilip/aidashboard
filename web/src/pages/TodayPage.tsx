@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from 'react';
 import { Box, Container, Heading, Text, Flex, Spinner, Center, Grid } from '@chakra-ui/react';
 import { Newspaper, Mail, FileText, Twitter, AlertCircle } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
@@ -20,9 +21,10 @@ const CONTENT_SECTIONS: ContentSection[] = [
 
 export default function TodayPage() {
   // Get items directly from context - already sorted by COALESCE(published_at, created_at) DESC
-  const { items: allItems, loading: syncLoading, error: syncError } = useItems();
+  const { items: allItems, loading: syncLoading, error: syncError, sourcesMap, likesMap, refreshLikes } = useItems();
 
-  const getItemsByType = (type: string) => {
+  // Memoize the filtering logic to avoid recalculating on every render
+  const getItemsByType = useCallback((type: string) => {
     // Get last 30 days of items for this type
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     return allItems
@@ -31,7 +33,15 @@ export default function TodayPage() {
         return item.sourceType === type && itemDate >= thirtyDaysAgo;
       })
       .slice(0, 6);
-  };
+  }, [allItems]);
+
+  // Memoize items by section to avoid recalculating on every render
+  const itemsBySection = useMemo(() => {
+    return CONTENT_SECTIONS.map(section => ({
+      section,
+      items: getItemsByType(section.type)
+    })).filter(({ items }) => items.length > 0);
+  }, [getItemsByType]);
 
   return (
     <Box minH="100vh" bg="gray.950" color="white">
@@ -109,10 +119,7 @@ export default function TodayPage() {
             {/* Content Sections */}
             {!syncError && (
               <Flex direction="column" gap={12}>
-                {CONTENT_SECTIONS.map((section) => {
-                  const items = getItemsByType(section.type);
-                  if (items.length === 0) return null;
-
+                {itemsBySection.map(({ section, items }) => {
                   const Icon = section.icon;
 
                   return (
@@ -153,7 +160,13 @@ export default function TodayPage() {
                         gap={6}
                       >
                         {items.map((item) => (
-                          <ItemCard key={item.id} item={item} />
+                          <ItemCard
+                            key={item.id}
+                            item={item}
+                            sourceName={sourcesMap.get(item.sourceId) || 'Unknown'}
+                            initialLiked={likesMap.get(item.id) || null}
+                            onLikeChange={refreshLikes}
+                          />
                         ))}
                       </Grid>
                     </Box>
