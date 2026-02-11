@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary from builder
+# Copy binary from builder (workspace builds to /app/target, not /app/server/ingestor/target)
 COPY --from=builder /app/target/release/ingestor /app/ingestor
 
 # Set environment variables (can be overridden at runtime)
