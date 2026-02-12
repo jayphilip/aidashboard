@@ -11,16 +11,25 @@ use sources::run_ingestion_cycle;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Logging
+    // Logging - write to stderr and enable timestamps
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
+        .target(env_logger::Target::Stderr)
         .init();
+
+    log::info!("AI Dashboard Ingestor starting...");
 
     // .env (optional locally; on Render you'll use env vars)
     dotenvy::dotenv().ok();
 
     // Load config (includes DATABASE_URL, ARXIV_API_URL, etc.)
-    let config = Config::from_env()?;
+    let config = match Config::from_env() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            log::error!("Failed to load configuration: {}", e);
+            return Err(e);
+        }
+    };
 
     log::info!("Connecting to database: {}", config.database_url);
 

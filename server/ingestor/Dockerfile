@@ -27,8 +27,9 @@ RUN cd server/ingestor && \
     cargo build --release 2>&1 || true && \
     rm -rf target/release/.fingerprint/ingestor-* target/release/deps/ingestor-*
 
-# Now copy actual source code
+# Now copy actual source code and migrations
 COPY server/ingestor/src ./server/ingestor/src/
+COPY server/migrations ./server/migrations/
 
 # Build the actual ingestor (fast because deps are cached)
 RUN cd server/ingestor && cargo build --release

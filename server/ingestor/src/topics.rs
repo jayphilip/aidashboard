@@ -5,8 +5,7 @@ pub fn extract_topics(title: &str, summary: Option<&str>) -> Vec<String> {
     let combined = format!(
         "{} {}",
         title,
-        summary.unwrap_or(""),
-
+        summary.unwrap_or("")
     );
     let text_lower = combined.to_lowercase();
 
