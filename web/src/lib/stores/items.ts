@@ -317,6 +317,7 @@ export async function getAllTopics(): Promise<string[]> {
 
 /**
  * Hydrate PGlite from Electric and expose data via Svelte store.
+ * Uses progressive sync: today's items first, then last 7 days in background.
  */
 export async function initializeItemsSync() {
   if (isSyncing) return; // already syncing
@@ -327,7 +328,7 @@ export async function initializeItemsSync() {
 
   try {
     const t0 = performance.now();
-    console.log('[ItemsSync] Initializing sync...');
+    console.log('[ItemsSync] Initializing progressive sync...');
 
     const t1 = performance.now();
     const pg = await getPGlite();
@@ -339,13 +340,17 @@ export async function initializeItemsSync() {
     const proxyUrl = `${baseUrl}/api/electric/shape`;
 
     const t2 = performance.now();
-    console.log(`[ItemsSync] Starting sync with proxy: ${proxyUrl} (elapsed: ${(t2 - t0).toFixed(0)}ms)`);
+    console.log(`[ItemsSync] Starting progressive sync with proxy: ${proxyUrl} (elapsed: ${(t2 - t0).toFixed(0)}ms)`);
 
-    // Calculate 7-day cutoff for shape filtering
-    // Round to start of day (midnight UTC) for consistency across page loads
+    // WAVE 1: Sync today's items first (fast, show UI quickly)
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const todayCutoff = today.toISOString();
+
+    // WAVE 2: Then sync last 7 days (background)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     sevenDaysAgo.setUTCHours(0, 0, 0, 0);
-    const cutoffIso = sevenDaysAgo.toISOString();
+    const sevenDaysCutoff = sevenDaysAgo.toISOString();
 
     const itemTopicsTimeout = setTimeout(() => {
       console.warn('[ItemsSync] Item topics sync timeout (3s), marking as complete');
@@ -353,22 +358,24 @@ export async function initializeItemsSync() {
     }, 3000);
 
     const t3 = performance.now();
-    console.log(`[ItemsSync] Creating shape subscriptions (elapsed: ${(t3 - t0).toFixed(0)}ms)`);
-    const shapes = await Promise.all([
+    console.log(`[ItemsSync] WAVE 1: Syncing today's items first (elapsed: ${(t3 - t0).toFixed(0)}ms)`);
+
+    // WAVE 1: Sync today's items + metadata tables (fast initial load)
+    const wave1Shapes = await Promise.all([
       (pg as any).electric.syncShapeToTable({
         shape: {
           url: proxyUrl,
           params: {
             table: 'items',
             offset: -1,
-            where: `COALESCE(published_at, created_at) >= '${cutoffIso}'`,
+            where: `COALESCE(published_at, created_at) >= '${todayCutoff}'`,
           },
         },
         table: 'items',
         primaryKey: ['id'],
-        shapeKey: 'items',
+        shapeKey: 'items_today',
         onError: (error: unknown) => {
-          console.error('[ItemsSync] items shape sync error:', error);
+          console.error('[ItemsSync] Today items shape sync error:', error);
           if (error instanceof Error) {
             console.error('[ItemsSync] Error stack:', error.stack);
           }
@@ -378,7 +385,7 @@ export async function initializeItemsSync() {
           });
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Items initial sync complete');
+          console.log('[ItemsSync] ✓ Today items synced');
           tryCompletingSync();
         },
       }),
@@ -397,7 +404,7 @@ export async function initializeItemsSync() {
           console.error('[ItemsSync] sources shape sync error:', error);
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Sources initial sync complete');
+          console.log('[ItemsSync] ✓ Sources synced');
           tryCompletingSync();
         },
       }),
@@ -421,7 +428,7 @@ export async function initializeItemsSync() {
         },
         onInitialSync: () => {
           clearTimeout(itemTopicsTimeout);
-          console.log('[ItemsSync] Item topics initial sync complete');
+          console.log('[ItemsSync] ✓ Item topics synced');
           tryCompletingSync();
         },
       }),
@@ -440,19 +447,49 @@ export async function initializeItemsSync() {
           console.error('[ItemsSync] item_likes shape sync error:', error);
         },
         onInitialSync: () => {
-          console.log('[ItemsSync] Item likes initial sync complete');
+          console.log('[ItemsSync] ✓ Item likes synced');
           tryCompletingSync();
         },
       }),
     ]);
 
-    shapeSubscriptions['items'] = shapes[0];
-    shapeSubscriptions['sources'] = shapes[1];
-    shapeSubscriptions['item_topics'] = shapes[2];
-    shapeSubscriptions['item_likes'] = shapes[3];
+    shapeSubscriptions['items_today'] = wave1Shapes[0];
+    shapeSubscriptions['sources'] = wave1Shapes[1];
+    shapeSubscriptions['item_topics'] = wave1Shapes[2];
+    shapeSubscriptions['item_likes'] = wave1Shapes[3];
 
     const t4 = performance.now();
-    console.log(`[ItemsSync] Shapes subscribed successfully (elapsed: ${(t4 - t0).toFixed(0)}ms)`);
+    console.log(`[ItemsSync] ✓ WAVE 1 complete (elapsed: ${(t4 - t0).toFixed(0)}ms)`);
+
+    // WAVE 2: Background sync for last 7 days (non-blocking)
+    setTimeout(async () => {
+      try {
+        console.log('[ItemsSync] WAVE 2: Syncing last 7 days in background...');
+        const wave2Shape = await (pg as any).electric.syncShapeToTable({
+          shape: {
+            url: proxyUrl,
+            params: {
+              table: 'items',
+              offset: -1,
+              where: `COALESCE(published_at, created_at) >= '${sevenDaysCutoff}'`,
+            },
+          },
+          table: 'items',
+          primaryKey: ['id'],
+          shapeKey: 'items_week',
+          onError: (error: unknown) => {
+            console.error('[ItemsSync] Week items background sync error:', error);
+          },
+          onInitialSync: () => {
+            console.log('[ItemsSync] ✓ WAVE 2 complete: Last 7 days synced');
+            refreshItemsFromDb(); // Refresh UI with new data
+          },
+        });
+        shapeSubscriptions['items_week'] = wave2Shape;
+      } catch (err) {
+        console.warn('[ItemsSync] Background sync failed (non-fatal):', err);
+      }
+    }, 2000); // Start after 2 seconds
   } catch (err) {
     console.error('[ItemsSync] initializeItemsSync failed:', err);
     isSyncing = false;
