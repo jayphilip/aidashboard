@@ -28,6 +28,15 @@ pub async fn create_pool(database_url: &str) -> Result<PgPool> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(30))
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                // Set statement timeout to 30 seconds to prevent indefinite hangs on locked tables
+                sqlx::query("SET statement_timeout = '30s'")
+                    .execute(&mut *conn)
+                    .await?;
+                Ok(())
+            })
+        })
         .connect(database_url)
         .await?;
 
