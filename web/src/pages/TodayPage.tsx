@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { Box, Container, Heading, Text, Flex, Spinner, Center, Grid } from '@chakra-ui/react';
+import { Box, Container, Heading, Text, Flex, Spinner, Grid } from '@chakra-ui/react';
 import { Newspaper, Mail, FileText, Twitter, AlertCircle } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
 import type { Item } from '@/lib/items';
@@ -45,26 +45,31 @@ export default function TodayPage() {
 
   return (
     <Box minH="100vh" bg="gray.950" color="white">
-      {/* Loading overlay */}
+      {/* Subtle sync indicator (non-blocking) */}
       {syncLoading && (
-        <Center
+        <Box
           position="fixed"
-          inset={0}
-          bg="rgba(0, 0, 0, 0.9)"
-          backdropFilter="blur(4px)"
-          zIndex={70}
+          top={4}
+          right={4}
+          bg="gray.800"
+          borderWidth="1px"
+          borderColor="gray.700"
+          rounded="lg"
+          px={4}
+          py={2}
+          zIndex={50}
+          boxShadow="lg"
         >
-          <Flex direction="column" align="center" gap={4}>
-            <Spinner size="xl" color="blue.400" borderWidth="3px" speed="0.8s" />
-            <Text color="gray.300" fontSize="lg" fontWeight="medium">
-              Loading AI content...
+          <Flex align="center" gap={2}>
+            <Spinner size="sm" color="blue.400" />
+            <Text color="gray.300" fontSize="sm" fontWeight="medium">
+              Syncing...
             </Text>
           </Flex>
-        </Center>
+        </Box>
       )}
 
-      {!syncLoading && (
-        <Box>
+      <Box>
           {/* Hero Section */}
           <Box
             bg="gray.900"
@@ -202,7 +207,6 @@ export default function TodayPage() {
             )}
           </Container>
         </Box>
-      )}
     </Box>
   );
 }

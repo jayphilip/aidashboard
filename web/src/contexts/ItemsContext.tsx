@@ -103,6 +103,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       console.log('[ItemsSync] Initializing...');
       const pg = await getPGlite();
       await getDb(); // Create schema
+
+      // OPTIMIZATION: Load cached data immediately (optimistic render)
+      console.log('[ItemsSync] Loading cached data for instant render...');
+      await refreshItems();
+      await loadAuxiliaryData();
+      setState(prev => ({ ...prev, loading: false })); // Show UI immediately!
       
       const baseUrl = `${window.location.origin}/v1/shape`;
       const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -121,7 +127,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         console.log('[ItemsSync] ✅ Sync complete');
 
         syncCompleted = true;
-        setState(prev => ({ ...prev, loading: false, error: null }));
+        // Don't set loading: false here - already done optimistically above
 
         // Debug logging
         (async () => {
