@@ -1,13 +1,8 @@
-// See https://svelte.dev/docs/kit/types#app.d.ts
-// for information about these interfaces
+// Global type declarations for the application
 declare global {
-	namespace App {
-		// interface Error {}
-		// interface Locals {}
-		// interface PageData {}
-		// interface PageState {}
-		// interface Platform {}
-	}
+  interface Window {
+    __ELECTRIC_URL__?: string;
+  }
 }
 
 export {};
