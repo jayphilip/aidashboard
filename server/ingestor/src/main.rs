@@ -42,18 +42,37 @@ async fn main() -> Result<()> {
         .await?;
     log::info!("Database connection successful: {:?}", result);
 
-    // Single ingestion cycle (no loop)
-    log::info!("Starting single ingestion cycle (cron mode)...");
-    match run_ingestion_cycle(&pool).await {
-        Ok(count) => {
-            log::info!("Ingestion cycle completed: {} items inserted/updated", count);
-        }
-        Err(e) => {
-            log::error!("Ingestion cycle failed: {e}");
-            // Optionally: return Err(e) to make the job fail visibly on Render
-        }
-    }
+    // Run continuous ingestion loop with configured interval
+    log::info!(
+        "Starting ingestion loop (interval: {} seconds)...",
+        config.ingestion_interval_secs
+    );
 
-    log::info!("Ingestion cycle finished; exiting.");
-    Ok(())
+    loop {
+        let cycle_start = std::time::Instant::now();
+
+        log::info!("Starting ingestion cycle...");
+        match run_ingestion_cycle(&pool).await {
+            Ok(count) => {
+                log::info!("Ingestion cycle completed: {} items inserted/updated", count);
+            }
+            Err(e) => {
+                log::error!("Ingestion cycle failed: {}", e);
+                // Continue running even if one cycle fails
+            }
+        }
+
+        let cycle_duration = cycle_start.elapsed();
+        log::info!("Cycle took {:.2}s", cycle_duration.as_secs_f64());
+
+        // Sleep for the configured interval
+        log::info!(
+            "Sleeping for {} seconds until next cycle...",
+            config.ingestion_interval_secs
+        );
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            config.ingestion_interval_secs,
+        ))
+        .await;
+    }
 }
