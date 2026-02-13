@@ -414,6 +414,7 @@ export async function initializeItemsSync() {
           params: {
             table: 'item_topics',
             offset: -1,
+            where: `created_at >= '${todayCutoff}'`,
           },
         },
         table: 'item_topics',
@@ -438,6 +439,7 @@ export async function initializeItemsSync() {
           params: {
             table: 'item_likes',
             offset: -1,
+            where: `created_at >= '${todayCutoff}'`,
           },
         },
         table: 'item_likes',
