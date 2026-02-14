@@ -250,7 +250,18 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             if (itemData.source_id) {
               itemData.source_id = parseInt(itemData.source_id, 10);
             }
-            
+
+            // Convert timestamp strings to Date objects (for Drizzle compatibility)
+            if (itemData.published_at && typeof itemData.published_at === 'string') {
+              itemData.published_at = new Date(itemData.published_at);
+            }
+            if (itemData.created_at && typeof itemData.created_at === 'string') {
+              itemData.created_at = new Date(itemData.created_at);
+            }
+            if (itemData.updated_at && typeof itemData.updated_at === 'string') {
+              itemData.updated_at = new Date(itemData.updated_at);
+            }
+
             // Parse topics array from PostgreSQL format
             if (itemData.topics) {
               if (typeof itemData.topics === 'string') {

@@ -27,12 +27,31 @@ export default function TodayPage() {
   const getItemsByType = useCallback((type: string) => {
     // Get last 30 days of items for this type
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    return allItems
-      .filter(item => {
-        const itemDate = item.publishedAt || item.createdAt;
-        return item.sourceType === type && itemDate >= thirtyDaysAgo;
-      })
-      .slice(0, 6);
+
+    console.log(`[TodayPage] Filtering for type "${type}":`, {
+      totalItems: allItems.length,
+      cutoffDate: thirtyDaysAgo,
+    });
+
+    const filtered = allItems.filter(item => {
+      const itemDate = item.publishedAt || item.createdAt;
+      const matchesType = item.sourceType === type;
+      const isRecent = itemDate >= thirtyDaysAgo;
+
+      if (item.sourceType === type && !isRecent) {
+        console.log(`[TodayPage] Item "${item.title}" matches type but is too old:`, {
+          itemDate,
+          itemDateType: typeof itemDate,
+          thirtyDaysAgo,
+          comparison: itemDate >= thirtyDaysAgo,
+        });
+      }
+
+      return matchesType && isRecent;
+    }).slice(0, 6);
+
+    console.log(`[TodayPage] Found ${filtered.length} items for type "${type}"`);
+    return filtered;
   }, [allItems]);
 
   // Memoize items by section to avoid recalculating on every render

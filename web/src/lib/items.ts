@@ -250,6 +250,20 @@ export async function getAllItems(): Promise<Item[]> {
       .select()
       .from(items)
       .orderBy(sql`COALESCE(${items.publishedAt}, ${items.createdAt}) DESC`);
+
+    console.log('[getAllItems] Fetched items:', rows.length);
+    if (rows.length > 0) {
+      console.log('[getAllItems] Sample item:', {
+        id: rows[0].id,
+        title: rows[0].title,
+        sourceType: rows[0].sourceType,
+        publishedAt: rows[0].publishedAt,
+        publishedAtType: typeof rows[0].publishedAt,
+        createdAt: rows[0].createdAt,
+        createdAtType: typeof rows[0].createdAt,
+      });
+    }
+
     return rows;
   } catch (err) {
     logger.warn('Failed to get all items:', err);
