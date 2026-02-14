@@ -34,7 +34,9 @@ export default function TodayPage() {
     });
 
     const filtered = allItems.filter(item => {
-      const itemDate = item.publishedAt || item.createdAt;
+      const itemDateRaw = item.publishedAt || item.createdAt;
+      // Ensure date is a Date object for comparison
+      const itemDate = typeof itemDateRaw === 'string' ? new Date(itemDateRaw) : itemDateRaw;
       const matchesType = item.sourceType === type;
       const isRecent = itemDate >= thirtyDaysAgo;
 
