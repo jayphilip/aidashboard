@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Box, Container, Grid, Spinner, Text, Center, Flex, Heading, Badge } from '@chakra-ui/react';
 import { AlertCircle, Inbox, Search } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
@@ -7,21 +8,69 @@ import { rankItems } from '@/lib/scoring';
 import type { Item } from '@/lib/items';
 import ItemCard from '@/components/ItemCard';
 import Filters, { type FilterOptions } from '@/components/Filters';
+import { paramsToFilters, filtersToParams } from '@/lib/utils/urlParams';
 
 export default function SearchPage() {
   const { loading: syncLoading, error: syncError, waitForSync } = useItems();
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<FilterOptions>({
-    sourceTypes: [],
-    topics: [],
-    dateRange: { start: null, end: null },
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialize filters from URL params on mount
+  const initialFiltersFromUrl = useMemo(() => {
+    const urlFilters = paramsToFilters(searchParams);
+    return {
+      sourceTypes: urlFilters.sourceTypes || [],
+      topics: urlFilters.topics || [],
+      dateRange: {
+        start: urlFilters.dateRange?.start
+          ? urlFilters.dateRange.start.toISOString().split('T')[0]
+          : null,
+        end: urlFilters.dateRange?.end
+          ? urlFilters.dateRange.end.toISOString().split('T')[0]
+          : null,
+      },
+    };
+  }, []); // Only run on mount
+
+  const [filters, setFilters] = useState<FilterOptions>(initialFiltersFromUrl);
 
   const handleFilterChange = useCallback((newFilters: FilterOptions) => {
     setFilters(newFilters);
-  }, []);
+
+    // Convert FilterOptions to SearchOptions for URL params
+    const searchOptions = {
+      sourceTypes: newFilters.sourceTypes.length > 0 ? newFilters.sourceTypes : undefined,
+      topics: newFilters.topics.length > 0 ? newFilters.topics : undefined,
+      dateRange: (newFilters.dateRange.start || newFilters.dateRange.end) ? {
+        start: newFilters.dateRange.start ? new Date(newFilters.dateRange.start) : undefined,
+        end: newFilters.dateRange.end ? new Date(newFilters.dateRange.end) : undefined,
+      } : undefined,
+    };
+
+    // Update URL params (replace: true prevents history pollution)
+    const params = filtersToParams(searchOptions);
+    setSearchParams(params, { replace: true });
+  }, [setSearchParams]);
+
+  // Sync filters when URL changes externally (e.g., bookmark navigation)
+  useEffect(() => {
+    const urlFilters = paramsToFilters(searchParams);
+    const newFilters = {
+      sourceTypes: urlFilters.sourceTypes || [],
+      topics: urlFilters.topics || [],
+      dateRange: {
+        start: urlFilters.dateRange?.start
+          ? urlFilters.dateRange.start.toISOString().split('T')[0]
+          : null,
+        end: urlFilters.dateRange?.end
+          ? urlFilters.dateRange.end.toISOString().split('T')[0]
+          : null,
+      },
+    };
+    setFilters(newFilters);
+  }, [searchParams]);
 
   useEffect(() => {
     async function loadItems() {

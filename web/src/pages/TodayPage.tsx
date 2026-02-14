@@ -1,8 +1,8 @@
 import { useMemo, useCallback } from 'react';
-import { Box, Container, Heading, Text, Flex, Spinner, Grid } from '@chakra-ui/react';
-import { Newspaper, Mail, FileText, Twitter, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Box, Container, Heading, Text, Flex, Spinner, Grid, Link as ChakraLink } from '@chakra-ui/react';
+import { Newspaper, Mail, FileText, Twitter, AlertCircle, ArrowRight } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
-import type { Item } from '@/lib/items';
 import ItemCard from '@/components/ItemCard';
 
 interface ContentSection {
@@ -173,6 +173,40 @@ export default function TodayPage() {
                           </Text>
                         </Box>
                       </Flex>
+
+                      {/* "More" button - only show if we have exactly 6 items */}
+                      {items.length === 6 && (
+                        <Flex justify="flex-end" mb={4}>
+                          <ChakraLink
+                            asChild
+                            display="flex"
+                            alignItems="center"
+                            gap={2}
+                            px={4}
+                            py={2}
+                            fontSize="sm"
+                            fontWeight="semibold"
+                            color="gray.400"
+                            bg="gray.800"
+                            rounded="lg"
+                            borderWidth="1px"
+                            borderColor="gray.700"
+                            _hover={{
+                              bg: "gray.750",
+                              color: "white",
+                              borderColor: "gray.600",
+                              textDecoration: "none",
+                              transform: "translateX(2px)",
+                            }}
+                            transition="all 0.2s"
+                          >
+                            <Link to={`/search?types=${section.type}`}>
+                              <Text>More {section.title}</Text>
+                              <ArrowRight size={16} />
+                            </Link>
+                          </ChakraLink>
+                        </Flex>
+                      )}
 
                       {/* Items Grid */}
                       <Grid

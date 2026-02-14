@@ -1,4 +1,4 @@
-import type { SearchOptions } from '$lib/stores/items';
+import type { SearchOptions } from '@/lib/items';
 
 /**
  * Convert filter options to URL search params
@@ -58,9 +58,13 @@ export function paramsToFilters(params: URLSearchParams): SearchOptions {
     filters.query = query;
   }
 
+  const VALID_SOURCE_TYPES = ['paper', 'newsletter', 'blog', 'tweet'];
+
   const types = params.get('types');
   if (types) {
-    filters.sourceTypes = types.split(',').filter(t => t.length > 0);
+    const parsed = types.split(',').filter(t => t.length > 0);
+    // Filter out invalid source types
+    filters.sourceTypes = parsed.filter(t => VALID_SOURCE_TYPES.includes(t));
   }
 
   const topics = params.get('topics');
@@ -82,14 +86,26 @@ export function paramsToFilters(params: URLSearchParams): SearchOptions {
   if (from || to) {
     filters.dateRange = {};
     if (from) {
-      // Parse as local date (YYYY-MM-DD format)
-      const [year, month, day] = from.split('-').map(Number);
-      filters.dateRange.start = new Date(year, month - 1, day);
+      try {
+        // Parse as local date (YYYY-MM-DD format)
+        const [year, month, day] = from.split('-').map(Number);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          filters.dateRange.start = new Date(year, month - 1, day);
+        }
+      } catch (e) {
+        console.warn('Invalid from date:', from);
+      }
     }
     if (to) {
-      // Parse as local date (YYYY-MM-DD format)
-      const [year, month, day] = to.split('-').map(Number);
-      filters.dateRange.end = new Date(year, month - 1, day);
+      try {
+        // Parse as local date (YYYY-MM-DD format)
+        const [year, month, day] = to.split('-').map(Number);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          filters.dateRange.end = new Date(year, month - 1, day);
+        }
+      } catch (e) {
+        console.warn('Invalid to date:', to);
+      }
     }
   }
 
