@@ -11,7 +11,7 @@ import Filters, { type FilterOptions } from '@/components/Filters';
 import { paramsToFilters, filtersToParams } from '@/lib/utils/urlParams';
 
 export default function SearchPage() {
-  const { loading: syncLoading, error: syncError, waitForSync } = useItems();
+  const { loading: syncLoading, error: syncError, waitForSync, sourcesMap } = useItems();
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -271,7 +271,11 @@ export default function SearchPage() {
               gap={6}
             >
               {items.map(item => (
-                <ItemCard key={item.id} item={item} />
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  sourceName={sourcesMap.get(item.sourceId) || 'Unknown'}
+                />
               ))}
             </Grid>
           )}
