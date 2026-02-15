@@ -7,6 +7,29 @@ use sqlx::PgPool;
 use std::time::Duration;
 use uuid::Uuid;
 
+/// Strip HTML tags and decode HTML entities from text
+fn strip_html(html: &str) -> String {
+    // Basic HTML tag stripping - replace with a proper HTML parser if needed
+    let re = regex::Regex::new(r"<[^>]*>").unwrap();
+    let text = re.replace_all(html, "");
+
+    // Decode common HTML entities
+    let text = text
+        .replace("&nbsp;", " ")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+        .replace("&#8217;", "'")
+        .replace("&#8220;", "\"")
+        .replace("&#8221;", "\"");
+
+    // Collapse multiple spaces and trim
+    let re_spaces = regex::Regex::new(r"\s+").unwrap();
+    re_spaces.replace_all(text.trim(), " ").to_string()
+}
+
 pub async fn run_rss_ingestion(pool: &PgPool, source: &crate::models::Source) -> Result<u64> {
     let ingest_url = match &source.ingest_url {
         Some(url) => url,
@@ -100,10 +123,10 @@ fn entry_to_item(entry: feed_rs::model::Entry, source: &crate::models::Source) -
     // If no URL found, skip this entry
     let url = url?;
 
-    // Extract summary
+    // Extract summary (strip HTML)
     let summary = entry
         .summary
-        .map(|s| s.content)
+        .map(|s| strip_html(&s.content))
         .or_else(|| {
             // Try to get first content entry
             entry
@@ -111,33 +134,35 @@ fn entry_to_item(entry: feed_rs::model::Entry, source: &crate::models::Source) -
                 .as_ref()
                 .and_then(|content| content.body.clone())
                 .map(|body| {
+                    let clean = strip_html(&body);
                     // Limit summary to first 500 chars
-                    let truncated = body
+                    let truncated = clean
                         .chars()
                         .take(500)
                         .collect::<String>();
-                    if truncated.len() < body.len() {
+                    if truncated.len() < clean.len() {
                         format!("{}...", truncated)
                     } else {
-                        body
+                        clean
                     }
                 })
         });
 
-    // Extract body (full content if available)
+    // Extract body (full content if available, strip HTML)
     let body = entry.content.as_ref().and_then(|content| {
         content
             .body
             .as_ref()
             .map(|b| {
-                let truncated = b
+                let clean = strip_html(b);
+                let truncated = clean
                     .chars()
                     .take(10000)
                     .collect::<String>();
-                if truncated.len() < b.len() {
+                if truncated.len() < clean.len() {
                     format!("{}...", truncated)
                 } else {
-                    b.clone()
+                    clean
                 }
             })
     });
