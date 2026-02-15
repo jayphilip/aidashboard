@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogBody,
   DialogCloseTrigger,
+  DialogPositioner,
 } from '@chakra-ui/react';
 import { getDb } from '@/lib/db';
 import { items as itemsTable, itemLikes } from '@/lib/schema';
@@ -180,7 +181,8 @@ export default function ItemDetailModal({
   return (
     <DialogRoot open={open} onOpenChange={(e) => !e.open && onClose()} size="xl">
       <DialogBackdrop bg="blackAlpha.700" backdropFilter="blur(4px)" />
-      <DialogContent bg="gray.900" borderWidth="1px" borderColor="gray.700" maxW="900px" maxH="90vh">
+      <DialogPositioner>
+        <DialogContent bg="gray.900" borderWidth="1px" borderColor="gray.700" maxW="900px" maxH="90vh">
         <DialogHeader
           bg="gray.850"
           borderBottomWidth="1px"
@@ -380,6 +382,7 @@ export default function ItemDetailModal({
           )}
         </DialogBody>
       </DialogContent>
+      </DialogPositioner>
     </DialogRoot>
   );
 }

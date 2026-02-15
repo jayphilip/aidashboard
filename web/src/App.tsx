@@ -5,6 +5,7 @@ import TodayPage from './pages/TodayPage';
 import SearchPage from './pages/SearchPage';
 import TopicsPage from './pages/TopicsPage';
 import SourcesPage from './pages/SourcesPage';
+import CardPreviewPage from './pages/CardPreviewPage';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/topics" element={<TopicsPage />} />
             <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/card-preview" element={<CardPreviewPage />} />
           </Routes>
         </Layout>
       </Box>
