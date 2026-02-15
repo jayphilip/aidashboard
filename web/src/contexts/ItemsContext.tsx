@@ -279,14 +279,18 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       // Sync items with batching
       let itemBatch: any[] = [];
       let itemCount = 0;
-      
+
+      const itemsUrl = `${baseUrl}?table=items&where=${encodeURIComponent(`published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`)}`;
+      console.log('[ItemsSync] Subscribing to items stream:', itemsUrl);
+
       const itemsStream = new ShapeStream({
-        url: `${baseUrl}?table=items&where=${encodeURIComponent(`published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`)}`,
+        url: itemsUrl,
       });
 
-      itemsStream.subscribe(async (messages) => {
-        for (const message of messages) {
-          if (message.headers?.control === 'up-to-date') {
+      itemsStream.subscribe(
+        async (messages) => {
+          for (const message of messages) {
+            if (message.headers?.control === 'up-to-date') {
             // Flush remaining batch
             if (itemBatch.length > 0) {
               await flushBatch('items', itemBatch, pg);
@@ -398,17 +402,26 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-      });
+      },
+      (error) => {
+        console.error('[ItemsSync] Items stream error:', error);
+        setState(prev => ({ ...prev, error: `Items sync failed: ${error.message}` }));
+      }
+      );
 
       // Sync sources with batching
       let sourcesBatch: any[] = [];
       let sourcesCount = 0;
       
+      const sourcesUrl = `${baseUrl}?table=sources`;
+      console.log('[ItemsSync] Subscribing to sources stream:', sourcesUrl);
+
       const sourcesStream = new ShapeStream({
-        url: `${baseUrl}?table=sources`,
+        url: sourcesUrl,
       });
 
-      sourcesStream.subscribe(async (messages) => {
+      sourcesStream.subscribe(
+        async (messages) => {
         for (const message of messages) {
           if (message.headers?.control === 'up-to-date') {
             if (sourcesBatch.length > 0) {
@@ -430,17 +443,26 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-      });
+      },
+      (error) => {
+        console.error('[ItemsSync] Sources stream error:', error);
+        setState(prev => ({ ...prev, error: `Sources sync failed: ${error.message}` }));
+      }
+      );
 
       // Sync item_likes with batching
       let likesBatch: any[] = [];
       let likesCount = 0;
-      
+
+      const likesUrl = `${baseUrl}?table=item_likes`;
+      console.log('[ItemsSync] Subscribing to item_likes stream:', likesUrl);
+
       const likesStream = new ShapeStream({
-        url: `${baseUrl}?table=item_likes`,
+        url: likesUrl,
       });
 
-      likesStream.subscribe(async (messages) => {
+      likesStream.subscribe(
+        async (messages) => {
         for (const message of messages) {
           if (message.headers?.control === 'up-to-date') {
             if (likesBatch.length > 0) {
@@ -462,7 +484,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
           }
         }
-      });
+      },
+      (error) => {
+        console.error('[ItemsSync] Likes stream error:', error);
+        setState(prev => ({ ...prev, error: `Likes sync failed: ${error.message}` }));
+      }
+      );
 
       console.log('[ItemsSync] All streams subscribed');
 
