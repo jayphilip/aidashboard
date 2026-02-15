@@ -165,8 +165,10 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       await refreshItems();
       await loadAuxiliaryData();
       setState(prev => ({ ...prev, loading: false })); // Show UI immediately!
-      
-      const baseUrl = `${window.location.origin}/v1/shape`;
+
+      const electricUrl = import.meta.env.VITE_ELECTRIC_URL || 'http://localhost:3000';
+      const baseUrl = `${electricUrl}/v1/shape`;
+      console.log('[ItemsSync] Electric base URL:', baseUrl);
       const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
       let completedShapes = new Set<string>();

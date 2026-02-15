@@ -15,6 +15,14 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . ./
 
+# Accept build args for Vite environment variables
+ARG VITE_ELECTRIC_URL
+ARG VITE_ELECTRIC_SECRET
+
+# Export as environment variables for Vite build
+ENV VITE_ELECTRIC_URL=${VITE_ELECTRIC_URL}
+ENV VITE_ELECTRIC_SECRET=${VITE_ELECTRIC_SECRET}
+
 # Build the React + Vite app
 RUN pnpm run build
 

@@ -40,6 +40,8 @@ services:
       ELECTRIC_INSECURE: "true"
       ELECTRIC_PUBLIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
       SNAPSHOT_TIMEOUT_MS: "120000"
+    ports:
+      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,10 +70,10 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      args:
+        VITE_ELECTRIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
+        VITE_ELECTRIC_SECRET: ${ELECTRIC_SECRET:-changeme}
     container_name: aidashboard-web
-    environment:
-      PUBLIC_ELECTRIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
-      ELECTRIC_SECRET: ${ELECTRIC_SECRET:-changeme}
     ports:
       - "5173:80"
     depends_on:
