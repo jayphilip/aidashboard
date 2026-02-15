@@ -3,7 +3,7 @@ import { getPGlite, getDb } from '@/lib/db';
 import { getAllItems, type Item } from '@/lib/items';
 import { logger } from '@/utils/logger';
 import { ShapeStream } from '@electric-sql/client';
-import { sources, itemLikes } from '@/lib/schema';
+import { sources, itemLikes, itemReads } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { useUser } from './UserContext';
 
@@ -13,12 +13,16 @@ interface ItemsState {
   items: Item[];
   sourcesMap: Map<number, string>;
   likesMap: Map<string, number | null>;
+  readsMap: Map<string, boolean>;
 }
 
 interface ItemsContextType extends ItemsState {
   refreshItems: () => Promise<void>;
   waitForSync: () => Promise<void>;
   refreshLikes: () => Promise<void>;
+  refreshReads: () => Promise<void>;
+  markAsRead: (itemId: string) => Promise<void>;
+  markAsUnread: (itemId: string) => Promise<void>;
 }
 
 const ItemsContext = createContext<ItemsContextType | undefined>(undefined);
@@ -35,6 +39,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     items: [],
     sourcesMap: new Map(),
     likesMap: new Map(),
+    readsMap: new Map(),
   });
 
   const refreshItems = useCallback(async () => {
@@ -62,7 +67,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         .where(eq(itemLikes.userId, userId));
       const likesMap = new Map(userLikes.map(l => [l.itemId, l.score]));
 
-      setState(prev => ({ ...prev, sourcesMap, likesMap }));
+      // Load all user reads into a map
+      const userReads = await db
+        .select()
+        .from(itemReads)
+        .where(eq(itemReads.userId, userId));
+      const readsMap = new Map(userReads.map(r => [r.itemId, true]));
+
+      setState(prev => ({ ...prev, sourcesMap, likesMap, readsMap }));
     } catch (err) {
       logger.warn('Failed to load auxiliary data:', err);
     }
@@ -81,6 +93,50 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       logger.warn('Failed to refresh likes:', err);
     }
   }, [userId]);
+
+  const refreshReads = useCallback(async () => {
+    try {
+      const db = await getDb();
+      const userReads = await db
+        .select()
+        .from(itemReads)
+        .where(eq(itemReads.userId, userId));
+      const readsMap = new Map(userReads.map(r => [r.itemId, true]));
+      setState(prev => ({ ...prev, readsMap }));
+    } catch (err) {
+      logger.warn('Failed to refresh reads:', err);
+    }
+  }, [userId]);
+
+  const markAsRead = useCallback(async (itemId: string) => {
+    try {
+      const db = await getDb();
+      // Insert or ignore if already exists
+      await db.insert(itemReads).values({
+        userId,
+        itemId,
+        readAt: new Date(),
+        createdAt: new Date(),
+      } as any).onConflictDoNothing();
+
+      await refreshReads();
+    } catch (err) {
+      logger.error('Failed to mark item as read:', err);
+    }
+  }, [userId, refreshReads]);
+
+  const markAsUnread = useCallback(async (itemId: string) => {
+    try {
+      const db = await getDb();
+      await db.delete(itemReads).where(
+        eq(itemReads.itemId, itemId)
+      );
+
+      await refreshReads();
+    } catch (err) {
+      logger.error('Failed to mark item as unread:', err);
+    }
+  }, [refreshReads]);
 
   const waitForSync = useCallback((): Promise<void> => {
     if (syncCompleted) {
@@ -425,7 +481,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   }, [initializeSync]);
 
   return (
-    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes }}>
+    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes, refreshReads, markAsRead, markAsUnread }}>
       {children}
     </ItemsContext.Provider>
   );

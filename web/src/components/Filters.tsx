@@ -18,6 +18,7 @@ export interface FilterOptions {
     start: string | null;
     end: string | null;
   };
+  readStatus?: 'all' | 'read' | 'unread';
 }
 
 interface FiltersProps {
@@ -47,6 +48,9 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
   const [dateEnd, setDateEnd] = useState<string>(
     initialFilters?.dateRange?.end || ''
   );
+  const [readStatus, setReadStatus] = useState<'all' | 'read' | 'unread'>(
+    initialFilters?.readStatus || 'all'
+  );
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
 
   // Load available topics
@@ -67,14 +71,16 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
         start: dateStart || null,
         end: dateEnd || null,
       },
+      readStatus,
     });
-  }, [sourceTypes, selectedTopics, dateStart, dateEnd, onFilterChange]);
+  }, [sourceTypes, selectedTopics, dateStart, dateEnd, readStatus, onFilterChange]);
 
   const handleClearFilters = () => {
     setSourceTypes([]);
     setSelectedTopics([]);
     setDateStart('');
     setDateEnd('');
+    setReadStatus('all');
   };
 
   const toggleSourceType = (value: string) => {
@@ -94,7 +100,10 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
   };
 
   const activeFilterCount =
-    sourceTypes.length + selectedTopics.length + (dateStart || dateEnd ? 1 : 0);
+    sourceTypes.length +
+    selectedTopics.length +
+    (dateStart || dateEnd ? 1 : 0) +
+    (readStatus !== 'all' ? 1 : 0);
 
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -275,6 +284,44 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
                 )}
               </Box>
             )}
+
+            {/* Read Status */}
+            <Box>
+              <Text
+                color="gray.400"
+                fontSize="xs"
+                mb={3}
+                fontWeight="bold"
+                textTransform="uppercase"
+                letterSpacing="wide"
+              >
+                Read Status
+              </Text>
+              <Flex gap={3} wrap="wrap">
+                {[
+                  { value: 'all', label: 'All Items' },
+                  { value: 'unread', label: 'Unread Only' },
+                  { value: 'read', label: 'Read Only' },
+                ].map((status) => (
+                  <Button
+                    key={status.value}
+                    size="sm"
+                    onClick={() => setReadStatus(status.value as 'all' | 'read' | 'unread')}
+                    bg={readStatus === status.value ? 'blue.900' : 'gray.800'}
+                    color="gray.200"
+                    borderWidth="1px"
+                    borderColor={readStatus === status.value ? 'blue.600' : 'gray.700'}
+                    _hover={{
+                      bg: readStatus === status.value ? 'blue.800' : 'gray.750',
+                      borderColor: readStatus === status.value ? 'blue.500' : 'gray.600',
+                    }}
+                    transition="all 0.2s"
+                  >
+                    {status.label}
+                  </Button>
+                ))}
+              </Flex>
+            </Box>
 
             {/* Date Range */}
             <Box>

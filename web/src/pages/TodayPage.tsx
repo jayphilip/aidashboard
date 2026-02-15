@@ -1,9 +1,11 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Box, Container, Heading, Text, Flex, Spinner, Grid, Link as ChakraLink } from '@chakra-ui/react';
 import { Newspaper, Mail, FileText, Twitter, AlertCircle, ArrowRight } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
 import ItemCard from '@/components/ItemCard';
+import ItemDetailModal from '@/components/ItemDetailModal';
+import type { Item } from '@/lib/items';
 
 interface ContentSection {
   type: 'paper' | 'newsletter' | 'blog' | 'tweet';
@@ -21,7 +23,20 @@ const CONTENT_SECTIONS: ContentSection[] = [
 
 export default function TodayPage() {
   // Get items directly from context - already sorted by COALESCE(published_at, created_at) DESC
-  const { items: allItems, loading: syncLoading, error: syncError, sourcesMap, likesMap, refreshLikes } = useItems();
+  const { items: allItems, loading: syncLoading, error: syncError, sourcesMap, likesMap, readsMap, refreshLikes, refreshReads } = useItems();
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const handleItemClick = useCallback((item: Item) => {
+    setSelectedItem(item);
+    setModalOpen(true);
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    // Delay clearing selected item to allow modal close animation
+    setTimeout(() => setSelectedItem(null), 200);
+  }, []);
 
   // Memoize the filtering logic to avoid recalculating on every render
   const getItemsByType = useCallback((type: string) => {
@@ -225,7 +240,9 @@ export default function TodayPage() {
                             item={item}
                             sourceName={sourcesMap.get(item.sourceId) || 'Unknown'}
                             initialLiked={likesMap.get(item.id) || null}
+                            isRead={readsMap.get(item.id) || false}
                             onLikeChange={refreshLikes}
+                            onClick={() => handleItemClick(item)}
                           />
                         ))}
                       </Grid>
@@ -262,6 +279,18 @@ export default function TodayPage() {
             )}
           </Container>
         </Box>
+
+      {/* Item Detail Modal */}
+      <ItemDetailModal
+        item={selectedItem}
+        sourceName={selectedItem ? sourcesMap.get(selectedItem.sourceId) || 'Unknown' : undefined}
+        initialLiked={selectedItem ? likesMap.get(selectedItem.id) || null : null}
+        initialRead={selectedItem ? readsMap.get(selectedItem.id) || false : false}
+        open={modalOpen}
+        onClose={handleModalClose}
+        onLikeChange={refreshLikes}
+        onReadChange={refreshReads}
+      />
     </Box>
   );
 }

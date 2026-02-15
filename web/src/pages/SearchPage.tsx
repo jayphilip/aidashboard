@@ -7,37 +7,70 @@ import { getRecentItems, searchItems } from '@/lib/items';
 import { rankItems } from '@/lib/scoring';
 import type { Item } from '@/lib/items';
 import ItemCard from '@/components/ItemCard';
+import ItemDetailModal from '@/components/ItemDetailModal';
 import Filters, { type FilterOptions } from '@/components/Filters';
 import { paramsToFilters, filtersToParams } from '@/lib/utils/urlParams';
+import { useFilterPreferences } from '@/hooks/useFilterPreferences';
 
 export default function SearchPage() {
-  const { loading: syncLoading, error: syncError, waitForSync, sourcesMap } = useItems();
+  const { loading: syncLoading, error: syncError, waitForSync, sourcesMap, likesMap, readsMap, refreshLikes, refreshReads } = useItems();
   const [items, setItems] = useState<Item[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const { savedFilters, saveFilters } = useFilterPreferences();
 
-  // Initialize filters from URL params on mount
+  const handleItemClick = useCallback((item: Item) => {
+    setSelectedItem(item);
+    setModalOpen(true);
+  }, []);
+
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setTimeout(() => setSelectedItem(null), 200);
+  }, []);
+
+  // Initialize filters from URL params on mount, fallback to saved preferences
   const initialFiltersFromUrl = useMemo(() => {
     const urlFilters = paramsToFilters(searchParams);
-    return {
-      sourceTypes: urlFilters.sourceTypes || [],
-      topics: urlFilters.topics || [],
-      dateRange: {
-        start: urlFilters.dateRange?.start
-          ? urlFilters.dateRange.start.toISOString().split('T')[0]
-          : null,
-        end: urlFilters.dateRange?.end
-          ? urlFilters.dateRange.end.toISOString().split('T')[0]
-          : null,
-      },
-    };
-  }, []); // Only run on mount
+    const hasUrlFilters = urlFilters.sourceTypes || urlFilters.topics || urlFilters.dateRange;
+
+    // If URL has filters, use them; otherwise use saved preferences
+    if (hasUrlFilters) {
+      return {
+        sourceTypes: urlFilters.sourceTypes || [],
+        topics: urlFilters.topics || [],
+        dateRange: {
+          start: urlFilters.dateRange?.start
+            ? urlFilters.dateRange.start.toISOString().split('T')[0]
+            : null,
+          end: urlFilters.dateRange?.end
+            ? urlFilters.dateRange.end.toISOString().split('T')[0]
+            : null,
+        },
+        readStatus: 'all' as const,
+      };
+    } else if (savedFilters) {
+      return savedFilters;
+    } else {
+      return {
+        sourceTypes: [],
+        topics: [],
+        dateRange: { start: null, end: null },
+        readStatus: 'all' as const,
+      };
+    }
+  }, [searchParams, savedFilters]); // Include savedFilters
 
   const [filters, setFilters] = useState<FilterOptions>(initialFiltersFromUrl);
 
   const handleFilterChange = useCallback((newFilters: FilterOptions) => {
     setFilters(newFilters);
+
+    // Save to localStorage
+    saveFilters(newFilters);
 
     // Convert FilterOptions to SearchOptions for URL params
     const searchOptions = {
@@ -52,7 +85,7 @@ export default function SearchPage() {
     // Update URL params (replace: true prevents history pollution)
     const params = filtersToParams(searchOptions);
     setSearchParams(params, { replace: true });
-  }, [setSearchParams]);
+  }, [setSearchParams, saveFilters]);
 
   // Sync filters when URL changes externally (e.g., bookmark navigation)
   useEffect(() => {
@@ -113,8 +146,16 @@ export default function SearchPage() {
           loadedItems = await getRecentItems(720, 100, 0);
         }
 
+        // Filter by read status if needed
+        let filteredItems = loadedItems;
+        if (filters.readStatus === 'read') {
+          filteredItems = loadedItems.filter(item => readsMap.get(item.id));
+        } else if (filters.readStatus === 'unread') {
+          filteredItems = loadedItems.filter(item => !readsMap.get(item.id));
+        }
+
         // Rank items
-        const ranked = rankItems(loadedItems);
+        const ranked = rankItems(filteredItems);
         const finalItems = ranked.map(r => r.item);
         setItems(finalItems);
       } catch (err) {
@@ -126,7 +167,7 @@ export default function SearchPage() {
     }
 
     loadItems();
-  }, [waitForSync, filters]);
+  }, [waitForSync, filters, readsMap]);
 
   const showError = syncError || error;
 
@@ -275,12 +316,28 @@ export default function SearchPage() {
                   key={item.id}
                   item={item}
                   sourceName={sourcesMap.get(item.sourceId) || 'Unknown'}
+                  initialLiked={likesMap.get(item.id) || null}
+                  isRead={readsMap.get(item.id) || false}
+                  onLikeChange={refreshLikes}
+                  onClick={() => handleItemClick(item)}
                 />
               ))}
             </Grid>
           )}
         </Container>
       )}
+
+      {/* Item Detail Modal */}
+      <ItemDetailModal
+        item={selectedItem}
+        sourceName={selectedItem ? sourcesMap.get(selectedItem.sourceId) || 'Unknown' : undefined}
+        initialLiked={selectedItem ? likesMap.get(selectedItem.id) || null : null}
+        initialRead={selectedItem ? readsMap.get(selectedItem.id) || false : false}
+        open={modalOpen}
+        onClose={handleModalClose}
+        onLikeChange={refreshLikes}
+        onReadChange={refreshReads}
+      />
     </Box>
   );
 }

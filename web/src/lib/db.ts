@@ -1,10 +1,10 @@
 // web/src/lib/db.ts
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
-import { papers, sources, items, itemTopics, itemLikes } from './schema';
+import { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences } from './schema';
 
 // Schema version - increment when schema changes to force client DB reset
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // Singleton-style promises so we only initialise once per tab
 let pglitePromise: Promise<PGlite> | null = null;
@@ -62,6 +62,7 @@ export function getDb() {
         ALTER TABLE IF EXISTS items DROP CONSTRAINT IF EXISTS items_source_id_fkey;
         ALTER TABLE IF EXISTS item_topics DROP CONSTRAINT IF EXISTS item_topics_item_id_fkey;
         ALTER TABLE IF EXISTS item_likes DROP CONSTRAINT IF EXISTS item_likes_item_id_fkey;
+        ALTER TABLE IF EXISTS item_reads DROP CONSTRAINT IF EXISTS item_reads_item_id_fkey;
       `).catch(err => {
         console.warn('[DB] Failed to drop FK constraints (may not exist):', err);
       });
@@ -127,6 +128,24 @@ export function getDb() {
           UNIQUE(user_id, item_id)
         );
 
+        CREATE TABLE IF NOT EXISTS item_reads (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          item_id UUID NOT NULL,
+          read_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(user_id, item_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS user_preferences (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL UNIQUE,
+          filter_preferences JSONB DEFAULT '{}'::JSONB,
+          ui_preferences JSONB DEFAULT '{}'::JSONB,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sources_active ON sources(active);
         CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(type);
         CREATE INDEX IF NOT EXISTS idx_sources_medium ON sources(medium);
@@ -139,6 +158,9 @@ export function getDb() {
         CREATE INDEX IF NOT EXISTS idx_item_topics_topic ON item_topics(topic);
         CREATE INDEX IF NOT EXISTS idx_item_likes_user_id ON item_likes(user_id);
         CREATE INDEX IF NOT EXISTS idx_item_likes_item_id ON item_likes(item_id);
+        CREATE INDEX IF NOT EXISTS idx_item_reads_user_id ON item_reads(user_id);
+        CREATE INDEX IF NOT EXISTS idx_item_reads_item_id ON item_reads(item_id);
+        CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
 
         -- Compound indexes for common query patterns
         CREATE INDEX IF NOT EXISTS idx_items_source_type_published ON items(source_type, published_at DESC);
@@ -147,7 +169,7 @@ export function getDb() {
         CREATE INDEX IF NOT EXISTS idx_item_likes_user_item ON item_likes(user_id, item_id);
       `);
 
-      return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes } });
+      return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences } });
     })();
   }
   return dbPromise;

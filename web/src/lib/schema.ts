@@ -95,3 +95,29 @@ export const itemLikes = pgTable('item_likes', {
   score: integer('score'), // -1, 0, or 1
   createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
 });
+
+// Item reads - track which items a user has read
+export const itemReads = pgTable('item_reads', {
+  id: serial('id').primaryKey().notNull(),
+  userId: text('user_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  readAt: timestamp('read_at', { mode: 'date' }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
+});
+
+// User preferences - filter preferences and other user settings
+export const userPreferences = pgTable('user_preferences', {
+  id: serial('id').primaryKey().notNull(),
+  userId: text('user_id').notNull().unique(),
+  filterPreferences: jsonb('filter_preferences').$type<{
+    sourceTypes?: string[];
+    topics?: string[];
+    dateRange?: { start?: string; end?: string };
+  }>().default({} as any),
+  uiPreferences: jsonb('ui_preferences').$type<{
+    cardLayout?: 'compact' | 'spacious';
+    theme?: 'dark' | 'light';
+  }>().default({} as any),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
+});

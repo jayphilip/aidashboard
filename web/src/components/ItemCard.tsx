@@ -13,7 +13,9 @@ interface ItemCardProps {
   item: Item;
   sourceName?: string;
   initialLiked?: number | null;
+  isRead?: boolean;
   onLikeChange?: () => void;
+  onClick?: () => void;
 }
 
 function getSourceIcon(sourceType: string) {
@@ -36,7 +38,7 @@ function getGradient(sourceType: string): string {
   }
 }
 
-const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialLiked = null, onLikeChange }: ItemCardProps) {
+const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialLiked = null, isRead = false, onLikeChange, onClick }: ItemCardProps) {
   const { userId } = useUser();
   const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
@@ -88,13 +90,15 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
         borderColor: 'gray.600',
         shadow: 'lg',
         transform: 'translateY(-2px)',
+        cursor: onClick ? 'pointer' : 'default',
       }}
       h="full"
       display="flex"
       flexDirection="column"
+      onClick={onClick}
     >
-      {/* Gradient Top Bar */}
-      <Box h="4px" bgGradient={gradient} />
+      {/* Gradient Top Bar with Read Indicator */}
+      <Box h="4px" bgGradient={gradient} opacity={isRead ? 0.5 : 1} />
 
       {/* Icon Header Bar */}
       <Flex
@@ -133,7 +137,7 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           fontSize="sm"
           fontWeight="bold"
           lineHeight="1.3"
-          color="white"
+          color={isRead ? 'gray.500' : 'white'}
           mb={2}
           noOfLines={3}
         >
@@ -173,8 +177,11 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
         <Flex gap={2}>
           <Button
             size="sm"
-            onClick={() => toggleLike(1)}
-            isLoading={loading}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLike(1);
+            }}
+            loading={loading}
             bg="gray.700"
             color="white"
             flex={1}
@@ -189,8 +196,11 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           </Button>
           <Button
             size="sm"
-            onClick={() => toggleLike(-1)}
-            isLoading={loading}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLike(-1);
+            }}
+            loading={loading}
             bg="gray.700"
             color="white"
             flex={1}
@@ -205,7 +215,10 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           </Button>
           <Button
             size="sm"
-            onClick={() => window.open(item.url, '_blank')}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(item.url, '_blank');
+            }}
             bgGradient={gradient}
             color="white"
             flex={1}
