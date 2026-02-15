@@ -1,12 +1,12 @@
 import { useState, memo } from 'react';
-import { Box, Flex, Text, Button, Badge } from '@chakra-ui/react';
+import { Box, Flex, Text, Button, Badge, Icon } from '@chakra-ui/react';
 import { getDb } from '@/lib/db';
 import { itemLikes } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { useUser } from '@/contexts/UserContext';
 import { formatDate, excerpt } from '@/utils/formatting';
 import { logger } from '@/utils/logger';
-import { ExternalLink, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ExternalLink, ThumbsUp, ThumbsDown, FileText, Twitter, PenTool, Mail } from 'lucide-react';
 import type { Item } from '@/lib/items';
 
 interface ItemCardProps {
@@ -16,48 +16,23 @@ interface ItemCardProps {
   onLikeChange?: () => void;
 }
 
-function getSourceIcon(sourceType: string): string {
+function getSourceIcon(sourceType: string) {
   switch (sourceType) {
-    case 'paper':
-      return '📄';
-    case 'newsletter':
-      return '📧';
-    case 'blog':
-      return '✍️';
-    case 'tweet':
-      return '🐦';
-    default:
-      return '📌';
+    case 'paper': return FileText;
+    case 'tweet': return Twitter;
+    case 'blog': return PenTool;
+    case 'newsletter': return Mail;
+    default: return FileText;
   }
 }
 
-function getSourceTypeLabel(sourceType: string): string {
+function getGradient(sourceType: string): string {
   switch (sourceType) {
-    case 'paper':
-      return 'Paper';
-    case 'tweet':
-      return 'Social';
-    case 'blog':
-      return 'Blog';
-    case 'newsletter':
-      return 'Newsletter';
-    default:
-      return 'Other';
-  }
-}
-
-function getSourceTypeColor(sourceType: string): string {
-  switch (sourceType) {
-    case 'paper':
-      return 'purple';
-    case 'tweet':
-      return 'blue';
-    case 'blog':
-      return 'orange';
-    case 'newsletter':
-      return 'green';
-    default:
-      return 'gray';
+    case 'paper': return 'linear(135deg, purple.600, pink.500)';
+    case 'tweet': return 'linear(135deg, blue.500, cyan.400)';
+    case 'blog': return 'linear(135deg, orange.500, red.400)';
+    case 'newsletter': return 'linear(135deg, green.500, teal.400)';
+    default: return 'linear(135deg, gray.600, gray.500)';
   }
 }
 
@@ -72,54 +47,25 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
 
     try {
       const db = await getDb();
-
-      // Check if like exists
       const existing = await db
         .select()
         .from(itemLikes)
-        .where(and(
-          eq(itemLikes.itemId, item.id),
-          eq(itemLikes.userId, userId)
-        ))
+        .where(and(eq(itemLikes.itemId, item.id), eq(itemLikes.userId, userId)))
         .limit(1);
 
       if (existing.length > 0) {
-        // Update or delete
         if (existing[0].score === score) {
-          // Delete if same score clicked again (toggle off)
-          await db
-            .delete(itemLikes)
-            .where(and(
-              eq(itemLikes.itemId, item.id),
-              eq(itemLikes.userId, userId)
-            ));
+          await db.delete(itemLikes).where(and(eq(itemLikes.itemId, item.id), eq(itemLikes.userId, userId)));
           setLiked(null);
         } else {
-          // Update
-          await db
-            .update(itemLikes)
-            .set({ score, createdAt: new Date() })
-            .where(and(
-              eq(itemLikes.itemId, item.id),
-              eq(itemLikes.userId, userId)
-            ));
+          await db.update(itemLikes).set({ score, createdAt: new Date() }).where(and(eq(itemLikes.itemId, item.id), eq(itemLikes.userId, userId)));
           setLiked(score);
         }
       } else {
-        // Insert
-        await db.insert(itemLikes).values({
-          userId,
-          itemId: item.id,
-          score,
-          createdAt: new Date(),
-        } as any);
+        await db.insert(itemLikes).values({ userId, itemId: item.id, score, createdAt: new Date() } as any);
         setLiked(score);
       }
-
-      // Notify parent to refresh likes
-      if (onLikeChange) {
-        onLikeChange();
-      }
+      if (onLikeChange) onLikeChange();
     } catch (err) {
       logger.error('Failed to toggle like:', err);
     } finally {
@@ -127,8 +73,8 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
     }
   }
 
-  const categories = item.rawMetadata?.categories;
-  const sourceTypeColor = getSourceTypeColor(item.sourceType);
+  const gradient = getGradient(item.sourceType);
+  const SourceIconComponent = getSourceIcon(item.sourceType);
 
   return (
     <Box
@@ -147,78 +93,73 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
       display="flex"
       flexDirection="column"
     >
-      {/* Header */}
-      <Box p={4} borderBottomWidth="1px" borderColor="gray.700">
-        <Flex align="flex-start" gap={3} mb={2}>
-          <Text
-            fontSize="md"
-            fontWeight="bold"
-            lineHeight="1.4"
-            color="gray.50"
-            flex={1}
-            minW={0}
-          >
-            {item.title}
-          </Text>
-        </Flex>
+      {/* Gradient Top Bar */}
+      <Box h="4px" bgGradient={gradient} />
 
-        <Flex align="center" gap={2} wrap="wrap">
-          <Badge
-            colorScheme={sourceTypeColor}
-            variant="subtle"
-            fontSize="xs"
-            px={2}
-            py={0.5}
-            rounded="md"
-            fontWeight="semibold"
-          >
-            {getSourceIcon(item.sourceType)} {getSourceTypeLabel(item.sourceType)}
-          </Badge>
-          {categories && categories.length > 0 && (
-            <Badge
-              fontSize="xs"
-              px={2}
-              py={0.5}
-              rounded="md"
-              bg="gray.700"
-              color="gray.300"
-              borderWidth="1px"
-              borderColor="gray.600"
-            >
-              {categories[0]}
-            </Badge>
-          )}
-          <Text fontSize="xs" color="gray.500" ml="auto">
-            {formatDate(item.publishedAt)}
-          </Text>
+      {/* Icon Header Bar */}
+      <Flex
+        bg="gray.850"
+        borderBottomWidth="1px"
+        borderColor="gray.700"
+        align="center"
+        gap={2}
+        p={2.5}
+        px={3}
+      >
+        <Flex
+          align="center"
+          justify="center"
+          w={7}
+          h={7}
+          rounded="md"
+          bgGradient={gradient}
+          flexShrink={0}
+        >
+          <Icon as={SourceIconComponent} color="white" boxSize={4} />
         </Flex>
-      </Box>
+        <Box flex={1} minW={0}>
+          <Text fontSize="2xs" color="gray.400" fontWeight="semibold" noOfLines={1}>
+            {sourceName}
+          </Text>
+        </Box>
+        <Text fontSize="2xs" color="gray.600" flexShrink={0}>
+          {formatDate(item.publishedAt)}
+        </Text>
+      </Flex>
 
-      {/* Body */}
-      <Box p={4} flex={1}>
-        <Text fontSize="xs" color="gray.500" mb={2} fontWeight="medium">
-          {sourceName}
+      {/* Content */}
+      <Box p={3} flex={1}>
+        <Text
+          fontSize="sm"
+          fontWeight="bold"
+          lineHeight="1.3"
+          color="white"
+          mb={2}
+          noOfLines={3}
+        >
+          {item.title}
         </Text>
 
-        {/* Summary */}
         {item.summary && (
-          <Text fontSize="sm" lineHeight="1.6" color="gray.300" mb={3}>
-            {excerpt(item.summary, 150)}
+          <Text fontSize="xs" lineHeight="1.4" color="gray.400" noOfLines={3} mb={3}>
+            {excerpt(item.summary, 100)}
           </Text>
         )}
 
-        {/* Topics */}
+        {/* Topics with subtle gradient */}
         {item.topics && item.topics.length > 0 && (
-          <Flex gap={1.5} flexWrap="wrap">
-            {item.topics.map(topic => (
+          <Flex gap={1} flexWrap="wrap">
+            {item.topics.slice(0, 3).map(topic => (
               <Badge
                 key={topic}
-                colorScheme="purple"
-                variant="subtle"
-                fontSize="xs"
+                bg="gray.700"
+                color="gray.300"
+                fontSize="2xs"
                 px={2}
                 py={0.5}
                 rounded="md"
+                borderWidth="1px"
+                borderColor="gray.600"
               >
                 {topic}
               </Badge>
@@ -227,63 +168,54 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
         )}
       </Box>
 
-      {/* Footer */}
-      <Box p={4} pt={3} borderTopWidth="1px" borderColor="gray.700" bg="gray.850">
-        <Flex justify="space-between" align="center" gap={2}>
-          <Flex gap={1.5}>
-            <Button
-              size="sm"
-              onClick={() => toggleLike(1)}
-              isLoading={loading}
-              minW="60px"
-              title={liked === 1 ? "Remove like" : "Like this"}
-              bg={liked === 1 ? 'green.600' : 'transparent'}
-              color={liked === 1 ? 'white' : 'green.400'}
-              borderWidth="1px"
-              borderColor={liked === 1 ? 'green.600' : 'green.700'}
-              _hover={{
-                bg: liked === 1 ? 'green.500' : 'green.900',
-                borderColor: liked === 1 ? 'green.500' : 'green.600',
-              }}
-            >
-              <Flex gap={1.5} align="center">
-                <ThumbsUp size={14} />
-                <Text fontSize="xs">Like</Text>
-              </Flex>
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => toggleLike(-1)}
-              isLoading={loading}
-              minW="70px"
-              title={liked === -1 ? "Remove dislike" : "Dislike this"}
-              bg={liked === -1 ? 'red.600' : 'transparent'}
-              color={liked === -1 ? 'white' : 'red.400'}
-              borderWidth="1px"
-              borderColor={liked === -1 ? 'red.600' : 'red.700'}
-              _hover={{
-                bg: liked === -1 ? 'red.500' : 'red.900',
-                borderColor: liked === -1 ? 'red.500' : 'red.600',
-              }}
-            >
-              <Flex gap={1.5} align="center">
-                <ThumbsDown size={14} />
-                <Text fontSize="xs">Dislike</Text>
-              </Flex>
-            </Button>
-          </Flex>
+      {/* Footer Actions */}
+      <Box p={2.5} borderTopWidth="1px" borderColor="gray.700" bg="gray.850">
+        <Flex gap={2}>
+          <Button
+            size="sm"
+            onClick={() => toggleLike(1)}
+            isLoading={loading}
+            bg="gray.700"
+            color="white"
+            flex={1}
+            fontSize="xs"
+            _hover={{
+              bg: 'gray.600',
+              transform: 'scale(1.05)',
+            }}
+            opacity={liked === 1 ? 1 : 0.7}
+          >
+            <ThumbsUp size={16} fill={liked === 1 ? 'currentColor' : 'none'} />
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => toggleLike(-1)}
+            isLoading={loading}
+            bg="gray.700"
+            color="white"
+            flex={1}
+            fontSize="xs"
+            _hover={{
+              bg: 'gray.600',
+              transform: 'scale(1.05)',
+            }}
+            opacity={liked === -1 ? 1 : 0.7}
+          >
+            <ThumbsDown size={16} fill={liked === -1 ? 'currentColor' : 'none'} />
+          </Button>
           <Button
             size="sm"
             onClick={() => window.open(item.url, '_blank')}
-            title="Open in new tab"
-            bg="blue.600"
+            bgGradient={gradient}
             color="white"
-            _hover={{ bg: 'blue.500' }}
+            flex={1}
+            fontSize="xs"
+            _hover={{
+              transform: 'scale(1.05)',
+              opacity: 0.9,
+            }}
           >
-            <Flex gap={1.5} align="center">
-              <Text fontSize="xs">Open</Text>
-              <ExternalLink size={14} />
-            </Flex>
+            <ExternalLink size={16} />
           </Button>
         </Flex>
       </Box>
