@@ -35,11 +35,24 @@ export async function getItemsBySourceType(sourceType: string): Promise<Item[]> 
   try {
     const db = await getDb();
     const rows = await db
-      .select()
+      .select({
+        id: items.id,
+        sourceId: items.sourceId,
+        sourceType: items.sourceType,
+        title: items.title,
+        url: items.url,
+        summary: items.summary,
+        body: items.body,
+        publishedAt: items.publishedAt,
+        rawMetadata: items.rawMetadata,
+        topics: items.topics,
+        createdAt: items.createdAt,
+        updatedAt: items.updatedAt,
+      })
       .from(items)
       .where(eq(items.sourceType, sourceType))
       .orderBy(desc(items.publishedAt));
-    return rows;
+    return rows as Item[];
   } catch (err) {
     logger.warn(`Failed to get items by source type ${sourceType}:`, err);
     return [];
@@ -59,7 +72,20 @@ export async function getRecentItems(
     const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
 
     let qb: any = db
-      .select()
+      .select({
+        id: items.id,
+        sourceId: items.sourceId,
+        sourceType: items.sourceType,
+        title: items.title,
+        url: items.url,
+        summary: items.summary,
+        body: items.body,
+        publishedAt: items.publishedAt,
+        rawMetadata: items.rawMetadata,
+        topics: items.topics,
+        createdAt: items.createdAt,
+        updatedAt: items.updatedAt,
+      })
       .from(items)
       .where(sql`COALESCE(${items.publishedAt}, ${items.createdAt}) >= ${cutoff}`)
       .orderBy(desc(sql`COALESCE(${items.publishedAt}, ${items.createdAt})`));
@@ -68,7 +94,7 @@ export async function getRecentItems(
     if (offset && offset > 0) qb = qb.offset(offset);
 
     const rows = await qb;
-    return rows;
+    return rows as Item[];
   } catch (err) {
     logger.warn('Failed to get recent items, returning empty array:', err);
     return [];
@@ -118,13 +144,41 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
   // Build WHERE conditions
   const conditions: any[] = [];
 
-  // Full-text search using PostgreSQL tsvector
+  // Check if search_vector column exists (for backward compatibility during migration)
+  let useFullTextSearch = false;
+  try {
+    // Try to detect if search_vector exists by checking the schema
+    const pg = await getPGlite();
+    const result = await pg.query(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name='items' AND column_name='search_vector'
+    `);
+    useFullTextSearch = result.rows.length > 0;
+  } catch (err) {
+    logger.warn('Could not detect search_vector column, falling back to LIKE search:', err);
+    useFullTextSearch = false;
+  }
+
+  // Text search with full-text search or fallback to LIKE
   if (query && query.trim()) {
-    console.log('[searchItems] Full-text search for query:', query);
-    // Use plainto_tsquery for natural language queries (handles multiple words, ignores punctuation)
-    conditions.push(
-      sql`${items.searchVector} @@ plainto_tsquery('english', ${query})`
-    );
+    if (useFullTextSearch) {
+      console.log('[searchItems] Full-text search for query:', query);
+      // Use plainto_tsquery for natural language queries (handles multiple words, ignores punctuation)
+      conditions.push(
+        sql`${items.searchVector} @@ plainto_tsquery('english', ${query})`
+      );
+    } else {
+      console.log('[searchItems] LIKE search fallback for query:', query);
+      const searchPattern = `%${query.toLowerCase()}%`;
+      conditions.push(
+        sql`(
+          LOWER(${items.title}) LIKE ${searchPattern}
+          OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
+          OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
+        )`
+      );
+    }
   }
 
   // Filter by source types
@@ -158,8 +212,24 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
     conditions.push(sql`${items.topics} && ${topics}`);
   }
 
+  // Define columns to select (excluding search_vector)
+  const selectColumns = {
+    id: items.id,
+    sourceId: items.sourceId,
+    sourceType: items.sourceType,
+    title: items.title,
+    url: items.url,
+    summary: items.summary,
+    body: items.body,
+    publishedAt: items.publishedAt,
+    rawMetadata: items.rawMetadata,
+    topics: items.topics,
+    createdAt: items.createdAt,
+    updatedAt: items.updatedAt,
+  };
+
   if (needsLikeJoin) {
-    let qb: any = db.select({ item: items }).from(items).leftJoin(itemLikes, and(eq(items.id, itemLikes.itemId), eq(itemLikes.userId, userId)));
+    let qb: any = db.select({ item: selectColumns }).from(items).leftJoin(itemLikes, and(eq(items.id, itemLikes.itemId), eq(itemLikes.userId, userId)));
 
     // Build filter conditions
     let allConditions = [...conditions];
@@ -179,8 +249,8 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
       qb = qb.where(and(...allConditions));
     }
 
-    // Group and sort - use full-text search ranking if query is present
-    if (query && query.trim()) {
+    // Group and sort - use full-text search ranking if query is present and available
+    if (query && query.trim() && useFullTextSearch) {
       qb = qb.groupBy(items.id).orderBy(
         sql`ts_rank(${items.searchVector}, plainto_tsquery('english', ${query})) DESC`
       );
@@ -191,15 +261,15 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
     rows = results.map((r: any) => r.item);
   } else {
     // No like filter, use regular query
-    let qb: any = db.select().from(items);
+    let qb: any = db.select(selectColumns).from(items);
 
     // Apply all conditions with a single where() using and()
     if (conditions.length > 0) {
       qb = qb.where(and(...conditions));
     }
 
-    // Add sort - use full-text search ranking if query is present
-    if (query && query.trim()) {
+    // Add sort - use full-text search ranking if query is present and available
+    if (query && query.trim() && useFullTextSearch) {
       qb = qb.orderBy(
         sql`ts_rank(${items.searchVector}, plainto_tsquery('english', ${query})) DESC`
       );
@@ -244,7 +314,20 @@ export async function getAllItems(): Promise<Item[]> {
   try {
     const db = await getDb();
     const rows = await db
-      .select()
+      .select({
+        id: items.id,
+        sourceId: items.sourceId,
+        sourceType: items.sourceType,
+        title: items.title,
+        url: items.url,
+        summary: items.summary,
+        body: items.body,
+        publishedAt: items.publishedAt,
+        rawMetadata: items.rawMetadata,
+        topics: items.topics,
+        createdAt: items.createdAt,
+        updatedAt: items.updatedAt,
+      })
       .from(items)
       .orderBy(sql`COALESCE(${items.publishedAt}, ${items.createdAt}) DESC`);
 
@@ -261,7 +344,7 @@ export async function getAllItems(): Promise<Item[]> {
       });
     }
 
-    return rows;
+    return rows as Item[];
   } catch (err) {
     logger.warn('Failed to get all items:', err);
     return [];
