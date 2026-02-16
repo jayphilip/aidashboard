@@ -8,7 +8,15 @@ import {
   integer,
   boolean,
   jsonb,
+  customType,
 } from 'drizzle-orm/pg-core';
+
+// Custom type for PostgreSQL tsvector (full-text search)
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return 'tsvector';
+  },
+});
 
 // Type for raw metadata stored in items
 export interface ItemRawMetadata {
@@ -75,6 +83,7 @@ export const items = pgTable('items', {
   publishedAt: timestamp('published_at', { mode: 'date' }).notNull(),
   rawMetadata: jsonb('raw_metadata').$type<ItemRawMetadata>().default({} as any),
   topics: text('topics').array().default([]),
+  searchVector: tsvector('search_vector'), // Full-text search vector
   createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
 });

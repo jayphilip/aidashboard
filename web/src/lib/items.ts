@@ -118,16 +118,12 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
   // Build WHERE conditions
   const conditions: any[] = [];
 
-  // Text search on title, summary, body
+  // Full-text search using PostgreSQL tsvector
   if (query && query.trim()) {
-    const searchPattern = `%${query.toLowerCase()}%`;
-    console.log('[searchItems] Searching for query:', query, 'pattern:', searchPattern);
+    console.log('[searchItems] Full-text search for query:', query);
+    // Use plainto_tsquery for natural language queries (handles multiple words, ignores punctuation)
     conditions.push(
-      sql`(
-        LOWER(${items.title}) LIKE ${searchPattern}
-        OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
-        OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
-      )`
+      sql`${items.searchVector} @@ plainto_tsquery('english', ${query})`
     );
   }
 
@@ -183,8 +179,14 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
       qb = qb.where(and(...allConditions));
     }
 
-    // Group and sort
-    qb = qb.groupBy(items.id).orderBy(desc(items.publishedAt));
+    // Group and sort - use full-text search ranking if query is present
+    if (query && query.trim()) {
+      qb = qb.groupBy(items.id).orderBy(
+        sql`ts_rank(${items.searchVector}, plainto_tsquery('english', ${query})) DESC`
+      );
+    } else {
+      qb = qb.groupBy(items.id).orderBy(desc(items.publishedAt));
+    }
     const results = await qb;
     rows = results.map((r: any) => r.item);
   } else {
@@ -196,26 +198,20 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
       qb = qb.where(and(...conditions));
     }
 
-    // Add sort
-    qb = qb.orderBy(desc(items.publishedAt));
+    // Add sort - use full-text search ranking if query is present
+    if (query && query.trim()) {
+      qb = qb.orderBy(
+        sql`ts_rank(${items.searchVector}, plainto_tsquery('english', ${query})) DESC`
+      );
+    } else {
+      qb = qb.orderBy(desc(items.publishedAt));
+    }
 
     rows = await qb;
   }
 
-  // Sort: exact title match first, then by recency
-  rows.sort((a, b) => {
-    if (query) {
-      const queryLower = query.toLowerCase();
-      const aExact = a.title.toLowerCase() === queryLower ? 0 : 1;
-      const bExact = b.title.toLowerCase() === queryLower ? 0 : 1;
-      if (aExact !== bExact) return aExact - bExact;
-    }
-    return b.publishedAt.getTime() - a.publishedAt.getTime();
-  });
-
+  // Apply pagination (sorting is already handled by the SQL query)
   const result = rows.slice(offset, offset + limit);
-
-  // Apply pagination
   return result;
 }
 
