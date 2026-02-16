@@ -125,8 +125,8 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
     conditions.push(
       sql`(
         LOWER(${items.title}) LIKE ${searchPattern}
-        OR LOWER(${items.summary}) LIKE ${searchPattern}
-        OR LOWER(${items.body}) LIKE ${searchPattern}
+        OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
+        OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
       )`
     );
   }

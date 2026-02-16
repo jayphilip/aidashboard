@@ -71,6 +71,7 @@ export default function SearchPage() {
 
   // Get search query from URL
   const searchQuery = searchParams.get('q') || '';
+  console.log('[SearchPage] Current search query from URL:', searchQuery);
 
   const handleFilterChange = useCallback((newFilters: FilterOptions) => {
     setFilters(newFilters);
