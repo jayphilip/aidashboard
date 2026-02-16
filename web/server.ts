@@ -126,6 +126,40 @@ const server = createServer(async (req, res) => {
         return;
       }
 
+      // Trigger ingestion for a source
+      if (req.method === 'POST' && pathname.match(/\/api\/sources\/(\d+)\/ingest/)) {
+        const idMatch = pathname.match(/\/api\/sources\/(\d+)\/ingest/);
+        if (!idMatch) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid source ID' }));
+          return;
+        }
+
+        const id = parseInt(idMatch[1], 10);
+
+        // Check if source exists
+        const sourceResult = await pool.query('SELECT * FROM sources WHERE id = $1', [id]);
+        if (sourceResult.rows.length === 0) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Source not found' }));
+          return;
+        }
+
+        const source = sourceResult.rows[0];
+
+        // TODO: Trigger actual ingestion logic here
+        // For now, we'll just return success and log it
+        console.log(`[API] Manual ingestion triggered for source ${id} (${source.name})`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: `Ingestion triggered for ${source.name}`,
+          source: source
+        }));
+        return;
+      }
+
       res.writeHead(405, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Method not allowed' }));
     } catch (error) {

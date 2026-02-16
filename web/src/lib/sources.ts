@@ -196,6 +196,30 @@ export async function createSource(
 }
 
 /**
+ * Trigger manual ingestion for a source
+ */
+export async function triggerSourceIngestion(sourceId: number) {
+  try {
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${apiUrl}/api/sources/${sourceId}/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (err) {
+    console.error('Failed to trigger source ingestion:', err);
+    throw err;
+  }
+}
+
+/**
  * Get source name by ID from the store (cached)
  * Returns a promise that resolves with the source name or 'Unknown' if not found
  */

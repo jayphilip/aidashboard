@@ -28,6 +28,7 @@ import {
   Plus,
   Edit,
   Trash2,
+  Play,
 } from 'lucide-react';
 import {
   getAllSources,
@@ -35,6 +36,7 @@ import {
   updateSource,
   toggleSourceActive,
   deleteSource,
+  triggerSourceIngestion,
   type Source,
 } from '@/lib/sources';
 import SourceModal from '@/components/SourceModal';
@@ -344,6 +346,27 @@ export default function SourcesPage() {
                             </ChakraSwitch.Control>
                           </ChakraSwitch.Root>
 
+                          <Button
+                            aria-label="run now"
+                            variant="ghost"
+                            size="sm"
+                            colorScheme="green"
+                            onClick={async () => {
+                              try {
+                                await triggerSourceIngestion(source.id);
+                                // TODO: Show success message
+                                console.log(`Ingestion triggered for ${source.name}`);
+                              } catch (err) {
+                                console.error(
+                                  'Failed to trigger ingestion:',
+                                  err,
+                                );
+                                // TODO: Show error message
+                              }
+                            }}
+                          >
+                            <Play size={16} />
+                          </Button>
                           <Button
                             aria-label="edit"
                             variant="ghost"
