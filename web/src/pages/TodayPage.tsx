@@ -231,6 +231,7 @@ export default function TodayPage() {
                             initialLiked={likesMap.get(item.id) || null}
                             isRead={readsMap.get(item.id) || false}
                             onLikeChange={refreshLikes}
+                            onReadChange={refreshReads}
                             onClick={() => handleItemClick(item)}
                           />
                         ))}

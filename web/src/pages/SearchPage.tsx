@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Container, Grid, Spinner, Text, Center, Flex, Heading, Badge } from '@chakra-ui/react';
-import { AlertCircle, Inbox, Search } from 'lucide-react';
+import { AlertCircle, Inbox, Search, X } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
 import { getRecentItems, searchItems } from '@/lib/items';
 import { rankItems } from '@/lib/scoring';
 import type { Item } from '@/lib/items';
 import ItemCard from '@/components/ItemCard';
 import ItemDetailModal from '@/components/ItemDetailModal';
+import SearchBar from '@/components/SearchBar';
 import Filters, { type FilterOptions } from '@/components/Filters';
 import { paramsToFilters, filtersToParams } from '@/lib/utils/urlParams';
 import { useFilterPreferences } from '@/hooks/useFilterPreferences';
@@ -68,6 +69,9 @@ export default function SearchPage() {
 
   const [filters, setFilters] = useState<FilterOptions>(initialFiltersFromUrl);
 
+  // Get search query from URL
+  const searchQuery = searchParams.get('q') || '';
+
   const handleFilterChange = useCallback((newFilters: FilterOptions) => {
     setFilters(newFilters);
 
@@ -118,20 +122,22 @@ export default function SearchPage() {
         // Wait for sync to complete
         await waitForSync();
 
-        // Check if filters are active
+        // Check if filters or search query are active
         const hasActiveFilters =
           filters.sourceTypes.length > 0 ||
           filters.topics.length > 0 ||
           filters.sourceIds.length > 0 ||
           filters.dateRange.start !== null ||
-          filters.dateRange.end !== null;
+          filters.dateRange.end !== null ||
+          searchQuery.trim() !== '';
 
         let loadedItems: Item[];
 
         if (hasActiveFilters) {
-          // Use searchItems with filters
+          // Use searchItems with filters and query
           loadedItems = await searchItems(
             {
+              query: searchQuery.trim() || undefined,
               sourceTypes: filters.sourceTypes.length > 0 ? filters.sourceTypes : undefined,
               topics: filters.topics.length > 0 ? filters.topics : undefined,
               sourceIds: filters.sourceIds.length > 0 ? filters.sourceIds : undefined,
@@ -173,7 +179,7 @@ export default function SearchPage() {
     }
 
     loadItems();
-  }, [waitForSync, filters, readsMap]);
+  }, [waitForSync, filters, readsMap, searchQuery]);
 
   const showError = syncError || error;
 
@@ -189,7 +195,7 @@ export default function SearchPage() {
           zIndex={70}
         >
           <Flex direction="column" align="center" gap={4}>
-            <Spinner size="xl" color="blue.400" borderWidth="3px" speed="0.8s" />
+            <Spinner size="xl" color="blue.400" borderWidth="3px" />
             <Text color="gray.300" fontSize="lg" fontWeight="medium">
               Loading AI content...
             </Text>
@@ -243,9 +249,48 @@ export default function SearchPage() {
                 )}
               </Box>
             </Flex>
-            <Text color="gray.400" fontSize="md">
+            <Text color="gray.400" fontSize="md" mb={4}>
               Filter and explore AI content by source, topic, and date
             </Text>
+
+            {/* Search Bar */}
+            <Box mb={4}>
+              <SearchBar />
+            </Box>
+
+            {/* Active Search Query Display */}
+            {searchQuery && (
+              <Flex
+                align="center"
+                gap={2}
+                bg="blue.900"
+                borderWidth="1px"
+                borderColor="blue.700"
+                rounded="lg"
+                px={4}
+                py={2}
+                mb={4}
+              >
+                <Search size={16} color="var(--chakra-colors-blue-300)" />
+                <Text color="blue.200" fontSize="sm" fontWeight="medium" flex={1}>
+                  Searching for: <Text as="span" fontWeight="bold">"{searchQuery}"</Text>
+                </Text>
+                <Box
+                  as="button"
+                  onClick={() => {
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('q');
+                    setSearchParams(newParams);
+                  }}
+                  p={1}
+                  rounded="md"
+                  _hover={{ bg: 'blue.800' }}
+                  cursor="pointer"
+                >
+                  <X size={16} color="var(--chakra-colors-blue-300)" />
+                </Box>
+              </Flex>
+            )}
           </Box>
 
           {/* Filters */}
@@ -325,6 +370,7 @@ export default function SearchPage() {
                   initialLiked={likesMap.get(item.id) || null}
                   isRead={readsMap.get(item.id) || false}
                   onLikeChange={refreshLikes}
+                  onReadChange={refreshReads}
                   onClick={() => handleItemClick(item)}
                 />
               ))}

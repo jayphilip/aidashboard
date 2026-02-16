@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { itemLikes } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
 import { useUser } from '@/contexts/UserContext';
+import { useItems } from '@/contexts/ItemsContext';
 import { formatDate, excerpt } from '@/utils/formatting';
 import { logger } from '@/utils/logger';
 import { ExternalLink, ThumbsUp, ThumbsDown, FileText, Twitter, PenTool, Mail } from 'lucide-react';
@@ -15,6 +16,7 @@ interface ItemCardProps {
   initialLiked?: number | null;
   isRead?: boolean;
   onLikeChange?: () => void;
+  onReadChange?: () => void;
   onClick?: () => void;
 }
 
@@ -38,8 +40,9 @@ function getGradient(sourceType: string): string {
   }
 }
 
-const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialLiked = null, isRead = false, onLikeChange, onClick }: ItemCardProps) {
+const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialLiked = null, isRead = false, onLikeChange, onReadChange, onClick }: ItemCardProps) {
   const { userId } = useUser();
+  const { markAsRead } = useItems();
   const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
 
@@ -73,6 +76,18 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleExternalLinkClick(e: React.MouseEvent) {
+    e.stopPropagation();
+
+    // Mark as read before opening the link
+    if (!isRead) {
+      await markAsRead(item.id);
+      if (onReadChange) onReadChange();
+    }
+
+    window.open(item.url, '_blank');
   }
 
   const gradient = getGradient(item.sourceType);
@@ -215,10 +230,7 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           </Button>
           <Button
             size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(item.url, '_blank');
-            }}
+            onClick={handleExternalLinkClick}
             bgGradient={gradient}
             color="white"
             flex={1}
