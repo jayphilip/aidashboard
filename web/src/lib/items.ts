@@ -121,6 +121,7 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
   // Text search on title, summary, body
   if (query && query.trim()) {
     const searchPattern = `%${query.toLowerCase()}%`;
+    console.log('[searchItems] Searching for query:', query, 'pattern:', searchPattern);
     conditions.push(
       sql`(
         LOWER(${items.title}) LIKE ${searchPattern}

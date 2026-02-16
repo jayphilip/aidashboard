@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Input, Flex, Box } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 
 export default function SearchBar() {
   const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     // Global keyboard shortcut for search (Cmd/Ctrl+K)
@@ -27,9 +29,24 @@ export default function SearchBar() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      // If we're already on /search, just update the params
+      if (location.pathname === '/search') {
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('q', query.trim());
+        setSearchParams(newParams);
+      } else {
+        navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      }
     }
   };
+
+  // Sync query with URL when on search page
+  useEffect(() => {
+    if (location.pathname === '/search') {
+      const urlQuery = searchParams.get('q') || '';
+      setQuery(urlQuery);
+    }
+  }, [location.pathname, searchParams]);
 
   const isMac = typeof window !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
   const shortcutKey = isMac ? '⌘' : 'Ctrl';

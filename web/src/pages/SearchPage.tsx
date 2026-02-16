@@ -135,26 +135,28 @@ export default function SearchPage() {
 
         if (hasActiveFilters) {
           // Use searchItems with filters and query
-          loadedItems = await searchItems(
-            {
-              query: searchQuery.trim() || undefined,
-              sourceTypes: filters.sourceTypes.length > 0 ? filters.sourceTypes : undefined,
-              topics: filters.topics.length > 0 ? filters.topics : undefined,
-              sourceIds: filters.sourceIds.length > 0 ? filters.sourceIds : undefined,
-              dateRange:
-                filters.dateRange.start || filters.dateRange.end
-                  ? {
-                      start: filters.dateRange.start ? new Date(filters.dateRange.start) : undefined,
-                      end: filters.dateRange.end ? new Date(filters.dateRange.end) : undefined,
-                    }
-                  : undefined,
-              limit: 100,
-              offset: 0,
-            },
-            'default-user'
-          );
+          const searchOptions = {
+            query: searchQuery.trim() || undefined,
+            sourceTypes: filters.sourceTypes.length > 0 ? filters.sourceTypes : undefined,
+            topics: filters.topics.length > 0 ? filters.topics : undefined,
+            sourceIds: filters.sourceIds.length > 0 ? filters.sourceIds : undefined,
+            dateRange:
+              filters.dateRange.start || filters.dateRange.end
+                ? {
+                    start: filters.dateRange.start ? new Date(filters.dateRange.start) : undefined,
+                    end: filters.dateRange.end ? new Date(filters.dateRange.end) : undefined,
+                  }
+                : undefined,
+            limit: 100,
+            offset: 0,
+          };
+
+          console.log('[SearchPage] Searching with options:', searchOptions);
+          loadedItems = await searchItems(searchOptions, 'default-user');
+          console.log('[SearchPage] Search returned:', loadedItems.length, 'items');
         } else {
           // Get recent items from last 30 days
+          console.log('[SearchPage] No active filters, getting recent items');
           loadedItems = await getRecentItems(720, 100, 0);
         }
 
