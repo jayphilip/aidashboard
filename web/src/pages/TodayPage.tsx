@@ -27,6 +27,14 @@ export default function TodayPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // Debug logging for mobile
+  console.log('[TodayPage] Render:', {
+    totalItems: allItems.length,
+    loading: syncLoading,
+    error: syncError,
+    sourcesCount: sourcesMap.size,
+  });
+
   const handleItemClick = useCallback((item: Item) => {
     setSelectedItem(item);
     setModalOpen(true);
