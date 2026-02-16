@@ -144,41 +144,27 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
   // Build WHERE conditions
   const conditions: any[] = [];
 
-  // Check if search_vector column exists (for backward compatibility during migration)
-  let useFullTextSearch = false;
-  try {
-    // Try to detect if search_vector exists by checking the schema
-    const pg = await getPGlite();
-    const result = await pg.query(`
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_name='items' AND column_name='search_vector'
-    `);
-    useFullTextSearch = result.rows.length > 0;
-  } catch (err) {
-    logger.warn('Could not detect search_vector column, falling back to LIKE search:', err);
-    useFullTextSearch = false;
-  }
-
-  // Text search with full-text search or fallback to LIKE
+  // Text search - try full-text search first, fall back to LIKE if column doesn't exist
   if (query && query.trim()) {
-    if (useFullTextSearch) {
-      console.log('[searchItems] Full-text search for query:', query);
-      // Use plainto_tsquery for natural language queries (handles multiple words, ignores punctuation)
-      conditions.push(
-        sql`${items.searchVector} @@ plainto_tsquery('english', ${query})`
-      );
-    } else {
-      console.log('[searchItems] LIKE search fallback for query:', query);
-      const searchPattern = `%${query.toLowerCase()}%`;
-      conditions.push(
-        sql`(
-          LOWER(${items.title}) LIKE ${searchPattern}
-          OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
-          OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
-        )`
-      );
-    }
+    console.log('[searchItems] Searching for query:', query);
+    // Try full-text search (will fail gracefully if search_vector doesn't exist)
+    const searchPattern = `%${query.toLowerCase()}%`;
+    conditions.push(
+      sql`(
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_name = 'items' AND column_name = 'search_vector'
+          )
+          THEN ${items.searchVector} @@ plainto_tsquery('english', ${query})
+          ELSE (
+            LOWER(${items.title}) LIKE ${searchPattern}
+            OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
+            OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
+          )
+        END
+      )`
+    );
   }
 
   // Filter by source types
@@ -249,14 +235,8 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
       qb = qb.where(and(...allConditions));
     }
 
-    // Group and sort - use full-text search ranking if query is present and available
-    if (query && query.trim() && useFullTextSearch) {
-      qb = qb.groupBy(items.id).orderBy(
-        sql`ts_rank(${items.searchVector}, plainto_tsquery('english', ${query})) DESC`
-      );
-    } else {
-      qb = qb.groupBy(items.id).orderBy(desc(items.publishedAt));
-    }
+    // Group and sort by recency
+    qb = qb.groupBy(items.id).orderBy(desc(items.publishedAt));
     const results = await qb;
     rows = results.map((r: any) => r.item);
   } else {
@@ -268,14 +248,8 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
       qb = qb.where(and(...conditions));
     }
 
-    // Add sort - use full-text search ranking if query is present and available
-    if (query && query.trim() && useFullTextSearch) {
-      qb = qb.orderBy(
-        sql`ts_rank(${items.searchVector}, plainto_tsquery('english', ${query})) DESC`
-      );
-    } else {
-      qb = qb.orderBy(desc(items.publishedAt));
-    }
+    // Add sort by recency
+    qb = qb.orderBy(desc(items.publishedAt));
 
     rows = await qb;
   }

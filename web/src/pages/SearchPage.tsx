@@ -148,7 +148,7 @@ export default function SearchPage() {
                     end: filters.dateRange.end ? new Date(filters.dateRange.end) : undefined,
                   }
                 : undefined,
-            limit: 100,
+            limit: 1000, // Increased limit to show more results
             offset: 0,
           };
 
@@ -158,7 +158,7 @@ export default function SearchPage() {
         } else {
           // Get recent items from last 30 days
           console.log('[SearchPage] No active filters, getting recent items');
-          loadedItems = await getRecentItems(720, 100, 0);
+          loadedItems = await getRecentItems(720, 1000, 0);
         }
 
         // Filter by read status if needed
