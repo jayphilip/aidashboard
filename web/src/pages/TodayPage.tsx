@@ -53,8 +53,23 @@ export default function TodayPage() {
 
     console.log(`[TodayPage] Filtering for type "${type}":`, {
       totalItems: allItems.length,
-      cutoffDate: thirtyDaysAgo,
+      cutoffDate: thirtyDaysAgo.toISOString(),
+      matchingType: allItems.filter(i => i.sourceType === type).length,
     });
+
+    // Sample the first item of this type for debugging
+    const sampleItem = allItems.find(i => i.sourceType === type);
+    if (sampleItem) {
+      const sampleDateRaw = sampleItem.publishedAt || sampleItem.createdAt;
+      const sampleDate = typeof sampleDateRaw === 'string' ? new Date(sampleDateRaw) : sampleDateRaw;
+      console.log(`[TodayPage] Sample ${type} item:`, {
+        title: sampleItem.title.substring(0, 50),
+        dateRaw: sampleDateRaw,
+        dateType: typeof sampleDateRaw,
+        dateParsed: sampleDate.toISOString(),
+        isRecent: sampleDate >= thirtyDaysAgo,
+      });
+    }
 
     const filtered = allItems.filter(item => {
       const itemDateRaw = item.publishedAt || item.createdAt;
@@ -62,15 +77,6 @@ export default function TodayPage() {
       const itemDate = typeof itemDateRaw === 'string' ? new Date(itemDateRaw) : itemDateRaw;
       const matchesType = item.sourceType === type;
       const isRecent = itemDate >= thirtyDaysAgo;
-
-      if (item.sourceType === type && !isRecent) {
-        console.log(`[TodayPage] Item "${item.title}" matches type but is too old:`, {
-          itemDate,
-          itemDateType: typeof itemDate,
-          thirtyDaysAgo,
-          comparison: itemDate >= thirtyDaysAgo,
-        });
-      }
 
       return matchesType && isRecent;
     }).slice(0, 6);
