@@ -45,18 +45,19 @@ This project implements bidirectional sync between the browser (PGlite) and serv
 1. User interacts with UI (e.g., creates/edits a source)
 2. UI calls write API endpoint (HTTP POST/PATCH/DELETE)
 3. Write API server writes directly to server Postgres
-4. **Optimistic update**: UI immediately updates local PGlite
-5. ElectricSQL detects change and syncs back to all clients
-6. PGlite receives authoritative update from Electric (overwrites optimistic)
+4. ElectricSQL detects change via logical replication
+5. Electric syncs update to all connected clients (typically < 1 second)
+6. PGlite receives update and UI refreshes automatically
 
-## Pattern: Online Writes with Optimistic State
+## Pattern: Online Writes
 
-This implementation uses ElectricSQL's **Pattern #1 (Online Writes)** with optimistic updates:
+This implementation uses ElectricSQL's **Pattern #1 (Online Writes)**:
 
 - **Best for**: Admin UIs, configuration pages, infrequent writes
 - **Requires**: Online connectivity for writes
 - **Benefits**: Simple, maintainable, no conflict resolution needed
-- **UX**: Instant feedback via optimistic updates
+- **UX**: Updates appear within 1 second via Electric sync
+- **Note**: No optimistic updates to avoid PGlite API complexity
 
 Reference: [ElectricSQL Writes Guide](https://electric-sql.com/docs/guides/writes)
 
