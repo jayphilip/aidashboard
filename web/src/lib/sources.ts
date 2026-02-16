@@ -94,12 +94,7 @@ export async function toggleSourceActive(sourceId: number, active: boolean) {
       throw new Error(`API error: ${response.statusText}`);
     }
 
-    // Optimistic update to local PGlite (will be overwritten by Electric sync)
-    const db = await getDb();
-    await db
-      .update(sources)
-      .set({ active, updatedAt: new Date() })
-      .where(eq(sources.id, sourceId));
+    // Electric will sync the change from server within seconds
   } catch (err) {
     console.error('Failed to toggle source active:', err);
     throw err;
@@ -134,12 +129,7 @@ export async function updateSource(
       throw new Error(`API error: ${response.statusText}`);
     }
 
-    // Optimistic update to local PGlite (will be overwritten by Electric sync)
-    const db = await getDb();
-    await db
-      .update(sources)
-      .set({ ...updates, updatedAt: new Date() } as any)
-      .where(eq(sources.id, sourceId));
+    // Electric will sync the change from server within seconds
   } catch (err) {
     console.error('Failed to update source:', err);
     throw err;
@@ -161,9 +151,7 @@ export async function deleteSource(sourceId: number) {
       throw new Error(`API error: ${response.statusText}`);
     }
 
-    // Optimistic delete from local PGlite (will be overwritten by Electric sync)
-    const db = await getDb();
-    await db.delete(sources).where(eq(sources.id, sourceId));
+    // Electric will sync the deletion from server within seconds
   } catch (err) {
     console.error('Failed to delete source:', err);
     throw err;
@@ -198,31 +186,9 @@ export async function createSource(
       throw new Error(errorData.error || `API error: ${response.statusText}`);
     }
 
-    // Optimistic insert to local PGlite (will be overwritten by Electric sync)
-    const pg = await getPGlite();
-    const now = new Date().toISOString();
-    await pg.exec(
-      `INSERT INTO sources (name, type, medium, ingest_url, active, frequency, meta, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)
-       ON CONFLICT (name, type) DO UPDATE SET
-         medium = EXCLUDED.medium,
-         ingest_url = EXCLUDED.ingest_url,
-         active = EXCLUDED.active,
-         frequency = EXCLUDED.frequency,
-         meta = EXCLUDED.meta,
-         updated_at = EXCLUDED.updated_at;`,
-      [
-        source.name,
-        source.type,
-        source.medium,
-        source.ingestUrl ?? null,
-        source.active ?? true,
-        source.frequency ?? null,
-        JSON.stringify(source.meta ?? {}),
-        now,
-        now,
-      ],
-    );
+    // Note: We don't do optimistic local insert here.
+    // Electric will sync the new source from the server within seconds.
+    // This avoids parameterized query issues with PGlite.
   } catch (err) {
     console.error('Failed to create source:', err);
     throw err;
