@@ -1,0 +1,20 @@
+# Dockerfile for write API server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies (production only for smaller image)
+RUN npm ci --only=production
+
+# Copy server file
+COPY server.ts ./
+
+# Install tsx for running TypeScript
+RUN npm install -g tsx
+
+EXPOSE 3001
+
+CMD ["tsx", "server.ts"]

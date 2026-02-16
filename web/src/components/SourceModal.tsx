@@ -36,6 +36,7 @@ const SourceModal: React.FC<Props> = ({ isOpen, onClose, initial, onSave }) => {
   const [frequency, setFrequency] = useState(initial?.frequency ?? '');
   const [active, setActive] = useState<boolean>(initial?.active ?? true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
 useEffect(() => {
   if (!isOpen) return;
@@ -45,11 +46,16 @@ useEffect(() => {
   setIngestUrl(initial?.ingestUrl ?? '');
   setFrequency(initial?.frequency ?? '');
   setActive(initial?.active ?? true);
+  setError(null);
 }, [initial, isOpen]);
 
   const handleSave = async () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      setError('Name is required');
+      return;
+    }
     setSaving(true);
+    setError(null);
     try {
       await onSave({
         name: name.trim(),
@@ -61,6 +67,9 @@ useEffect(() => {
         meta: {},
       });
       onClose();
+    } catch (err) {
+      console.error('Save failed:', err);
+      setError((err as Error)?.message || 'Failed to save source');
     } finally {
       setSaving(false);
     }
@@ -196,6 +205,21 @@ useEffect(() => {
           </VStack>
         </Box>
 
+        {error && (
+          <Box
+            mt={4}
+            p={3}
+            bg="rgba(220, 38, 38, 0.1)"
+            borderWidth="1px"
+            borderColor="red.800"
+            borderRadius="md"
+          >
+            <Text color="red.400" fontSize="sm">
+              {error}
+            </Text>
+          </Box>
+        )}
+
         <Flex justify="flex-end" gap={3} mt={6}>
           <Button variant="ghost" onClick={onClose}>
             Cancel
@@ -203,9 +227,9 @@ useEffect(() => {
           <Button
             colorScheme="orange"
             onClick={handleSave}
-            loading={saving}
+            disabled={saving}
           >
-            Save
+            {saving ? 'Saving...' : 'Save'}
           </Button>
         </Flex>
       </Box>

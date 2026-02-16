@@ -82,6 +82,19 @@ export async function getSourcesByMedium(medium: string): Promise<Source[]> {
  */
 export async function toggleSourceActive(sourceId: number, active: boolean) {
   try {
+    // Write to server Postgres via API (will sync back via Electric)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${apiUrl}/api/sources/${sourceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+
+    // Optimistic update to local PGlite (will be overwritten by Electric sync)
     const db = await getDb();
     await db
       .update(sources)
@@ -109,6 +122,19 @@ export async function updateSource(
   }>
 ) {
   try {
+    // Write to server Postgres via API (will sync back via Electric)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${apiUrl}/api/sources/${sourceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+
+    // Optimistic update to local PGlite (will be overwritten by Electric sync)
     const db = await getDb();
     await db
       .update(sources)
@@ -125,6 +151,17 @@ export async function updateSource(
  */
 export async function deleteSource(sourceId: number) {
   try {
+    // Write to server Postgres via API (will sync back via Electric)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${apiUrl}/api/sources/${sourceId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`);
+    }
+
+    // Optimistic delete from local PGlite (will be overwritten by Electric sync)
     const db = await getDb();
     await db.delete(sources).where(eq(sources.id, sourceId));
   } catch (err) {
@@ -140,8 +177,28 @@ export async function createSource(
   source: Omit<Source, 'id' | 'createdAt' | 'updatedAt'>
 ) {
   try {
-    // Use raw upsert SQL against the local PGlite instance to avoid
-    // primary-key sequence conflicts when inserting.
+    // Write to server Postgres via API (will sync back via Electric)
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const response = await fetch(`${apiUrl}/api/sources`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: source.name,
+        type: source.type,
+        medium: source.medium,
+        ingestUrl: source.ingestUrl ?? null,
+        active: source.active ?? true,
+        frequency: source.frequency ?? null,
+        meta: source.meta ?? {},
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.statusText}`);
+    }
+
+    // Optimistic insert to local PGlite (will be overwritten by Electric sync)
     const pg = await getPGlite();
     const now = new Date().toISOString();
     await pg.exec(

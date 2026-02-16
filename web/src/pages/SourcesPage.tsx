@@ -461,17 +461,12 @@ export default function SourcesPage() {
           }}
           initial={selectedSource ?? undefined}
           onSave={async (payload) => {
-            try {
-              if (selectedSource) {
-                await updateSource(selectedSource.id, payload as any);
-              } else {
-                await createSource(payload as any);
-              }
-              await reloadSources();
-            } catch (err) {
-              console.error('Failed to save source:', err);
-              throw err;
+            if (selectedSource) {
+              await updateSource(selectedSource.id, payload as any);
+            } else {
+              await createSource(payload as any);
             }
+            await reloadSources();
           }}
         />
       </Box>

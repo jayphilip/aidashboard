@@ -65,18 +65,37 @@ services:
       - aidashboard
     restart: unless-stopped
 
+  api:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.api
+    container_name: aidashboard-api
+    environment:
+      DATABASE_URL: "postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-aidashboard}?sslmode=disable"
+      API_PORT: 3001
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aidashboard
+    restart: unless-stopped
+
   web:
     build:
       context: ./web
       dockerfile: Dockerfile
       args:
         VITE_ELECTRIC_URL: ${ELECTRIC_URL:-http://localhost:3000}
+        VITE_API_URL: ${API_URL:-http://localhost:3001}
         VITE_ELECTRIC_SECRET: ${ELECTRIC_SECRET:-changeme}
     container_name: aidashboard-web
     ports:
       - "5173:80"
     depends_on:
       - electric
+      - api
     networks:
       - aidashboard
     restart: unless-stopped
