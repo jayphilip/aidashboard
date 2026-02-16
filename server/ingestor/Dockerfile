@@ -25,14 +25,17 @@ RUN mkdir -p server/ingestor/src/sources && \
 # Build dependencies only (this layer will be cached unless Cargo.toml changes)
 RUN cd server/ingestor && \
     cargo build --release 2>&1 || true && \
-    rm -rf target/release/.fingerprint/ingestor-* target/release/deps/ingestor-*
+    rm -rf target/release/.fingerprint/ingestor-* target/release/deps/ingestor-* && \
+    cd /app && \
+    rm -rf target/release/.fingerprint/ingestor-* target/release/deps/ingestor-* target/release/ingestor
 
 # Now copy actual source code and migrations
 COPY server/ingestor/src ./server/ingestor/src/
 COPY server/migrations ./server/migrations/
 
 # Build the actual ingestor (fast because deps are cached)
-RUN cd server/ingestor && cargo build --release
+# Build from workspace root so binary goes to /app/target/release/
+RUN cargo build --release -p ingestor
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -44,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary from builder (workspace builds to /app/target, not /app/server/ingestor/target)
+# Copy binary from builder
 COPY --from=builder /app/target/release/ingestor /app/ingestor
 
 # Set environment variables (can be overridden at runtime)
