@@ -120,31 +120,6 @@ export default function TodayPage() {
       )}
 
       <Box>
-          {/* Hero Section */}
-          <Box
-            bg="gray.900"
-            borderBottomWidth="1px"
-            borderColor="gray.800"
-            py={12}
-            mb={8}
-          >
-            <Container maxW="7xl">
-              <Flex direction="column" align="center" textAlign="center" gap={4}>
-                <Heading
-                  size="2xl"
-                  bgGradient="linear(to-r, blue.400, cyan.400, purple.400)"
-                  bgClip="text"
-                  fontWeight="black"
-                  letterSpacing="tight"
-                >
-                  Today's AI Updates
-                </Heading>
-                <Text color="gray.400" fontSize="lg" maxW="2xl">
-                  Your curated feed of the latest AI research, insights, and discussions
-                </Text>
-              </Flex>
-            </Container>
-          </Box>
 
           <Container maxW="7xl" pb={12}>
             {/* Error message */}
