@@ -120,6 +120,33 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
     );
   };
 
+  // Filter sources based on selected source types
+  const filteredSources = sourceTypes.length > 0
+    ? availableSources.filter(source =>
+        sourceTypes.some(type => {
+          // Map source types to source.type or source.medium values
+          if (type === 'paper') return source.type === 'arxiv' || source.medium === 'paper';
+          if (type === 'newsletter') return source.type === 'rss' && source.medium === 'newsletter';
+          if (type === 'blog') return source.type === 'rss' && source.medium === 'blog';
+          if (type === 'tweet') return source.type === 'twitter_api';
+          return false;
+        })
+      )
+    : availableSources;
+
+  // Automatically deselect sources that are no longer visible due to source type filtering
+  useEffect(() => {
+    if (sourceTypes.length > 0) {
+      const filteredSourceIds = new Set(filteredSources.map(s => s.id));
+      const newSelectedSourceIds = selectedSourceIds.filter(id => filteredSourceIds.has(id));
+
+      // Only update if there's a change to avoid infinite loops
+      if (newSelectedSourceIds.length !== selectedSourceIds.length) {
+        setSelectedSourceIds(newSelectedSourceIds);
+      }
+    }
+  }, [sourceTypes, filteredSources, selectedSourceIds]);
+
   const activeFilterCount =
     sourceTypes.length +
     selectedTopics.length +
@@ -250,18 +277,24 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
             </Box>
 
             {/* Sources */}
-            {availableSources.length > 0 && (
+            {filteredSources.length > 0 && (
               <Box>
-                <Text
-                  color="gray.400"
-                  fontSize="xs"
-                  mb={3}
-                  fontWeight="bold"
-                  textTransform="uppercase"
-                  letterSpacing="wide"
-                >
-                  Sources
-                </Text>
+                <Flex align="center" justify="space-between" mb={3}>
+                  <Text
+                    color="gray.400"
+                    fontSize="xs"
+                    fontWeight="bold"
+                    textTransform="uppercase"
+                    letterSpacing="wide"
+                  >
+                    Sources
+                  </Text>
+                  {sourceTypes.length > 0 && (
+                    <Text color="gray.500" fontSize="xs" fontStyle="italic">
+                      {filteredSources.length} of {availableSources.length}
+                    </Text>
+                  )}
+                </Flex>
                 <Flex gap={2.5} wrap="wrap" maxH="200px" overflowY="auto" css={{
                   '&::-webkit-scrollbar': {
                     width: '8px',
@@ -278,7 +311,7 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
                     background: 'var(--chakra-colors-gray-500)',
                   },
                 }}>
-                  {availableSources.map((source) => (
+                  {filteredSources.map((source) => (
                     <Flex
                       key={source.id}
                       as="label"
