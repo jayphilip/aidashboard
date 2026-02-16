@@ -293,6 +293,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       // Sync items with batching
       let itemBatch: any[] = [];
       let itemCount = 0;
+      let itemsInitialSyncDone = false;
 
       const itemsUrl = `${baseUrl}?table=items&where=${encodeURIComponent(`published_at >= '${cutoffIso}' OR created_at >= '${cutoffIso}'`)}`;
       console.log('[ItemsSync] Subscribing to items stream:', itemsUrl);
@@ -310,8 +311,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
               await flushBatch('items', itemBatch, pg);
               itemBatch = [];
             }
-            console.log(`[ItemsSync] items complete - ${itemCount} total`);
-            onShapeComplete('items');
+
+            if (!itemsInitialSyncDone) {
+              console.log(`[ItemsSync] items initial sync complete - ${itemCount} total`);
+              onShapeComplete('items');
+              itemsInitialSyncDone = true;
+            } else {
+              console.log(`[ItemsSync] items update received`);
+            }
             // Don't return - continue processing future updates
             continue;
           }
@@ -435,7 +442,8 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       // Sync sources with batching
       let sourcesBatch: any[] = [];
       let sourcesCount = 0;
-      
+      let sourcesInitialSyncDone = false;
+
       const sourcesUrl = `${baseUrl}?table=sources`;
       console.log('[ItemsSync] Subscribing to sources stream:', sourcesUrl);
 
@@ -451,8 +459,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
               await flushBatch('sources', sourcesBatch, pg);
               sourcesBatch = [];
             }
-            console.log(`[ItemsSync] sources complete - ${sourcesCount} total`);
-            onShapeComplete('sources');
+
+            if (!sourcesInitialSyncDone) {
+              console.log(`[ItemsSync] sources initial sync complete - ${sourcesCount} total`);
+              onShapeComplete('sources');
+              sourcesInitialSyncDone = true;
+            } else {
+              console.log(`[ItemsSync] sources update received`);
+            }
             // Don't return - continue processing future updates
             continue;
           }
@@ -485,6 +499,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       // Sync item_likes with batching
       let likesBatch: any[] = [];
       let likesCount = 0;
+      let likesInitialSyncDone = false;
 
       const likesUrl = `${baseUrl}?table=item_likes`;
       console.log('[ItemsSync] Subscribing to item_likes stream:', likesUrl);
@@ -501,8 +516,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
               await flushBatch('item_likes', likesBatch, pg);
               likesBatch = [];
             }
-            console.log(`[ItemsSync] item_likes complete - ${likesCount} total`);
-            onShapeComplete('item_likes');
+
+            if (!likesInitialSyncDone) {
+              console.log(`[ItemsSync] item_likes initial sync complete - ${likesCount} total`);
+              onShapeComplete('item_likes');
+              likesInitialSyncDone = true;
+            } else {
+              console.log(`[ItemsSync] item_likes update received`);
+            }
             // Don't return - continue processing future updates
             continue;
           }
