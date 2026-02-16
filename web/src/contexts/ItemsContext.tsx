@@ -312,7 +312,8 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
             console.log(`[ItemsSync] items complete - ${itemCount} total`);
             onShapeComplete('items');
-            return;
+            // Don't return - continue processing future updates
+            continue;
           }
           
           if (message.value) {
@@ -416,6 +417,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
           }
         }
+
+        // Flush any remaining batch after processing all messages
+        if (itemBatch.length > 0) {
+          await flushBatch('items', itemBatch, pg);
+          itemBatch = [];
+          // Refresh items when new data arrives
+          await refreshItems();
+        }
       },
       (error) => {
         console.error('[ItemsSync] Items stream error:', error);
@@ -444,18 +453,27 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
             console.log(`[ItemsSync] sources complete - ${sourcesCount} total`);
             onShapeComplete('sources');
-            return;
+            // Don't return - continue processing future updates
+            continue;
           }
-          
+
           if (message.value) {
             sourcesCount++;
             sourcesBatch.push(message.value);
-            
+
             if (sourcesBatch.length >= BATCH_SIZE) {
               await flushBatch('sources', sourcesBatch, pg);
               sourcesBatch = [];
             }
           }
+        }
+
+        // Flush any remaining batch after processing all messages
+        if (sourcesBatch.length > 0) {
+          await flushBatch('sources', sourcesBatch, pg);
+          sourcesBatch = [];
+          // Refresh sources map when new data arrives
+          await loadAuxiliaryData();
         }
       },
       (error) => {
@@ -485,18 +503,27 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             }
             console.log(`[ItemsSync] item_likes complete - ${likesCount} total`);
             onShapeComplete('item_likes');
-            return;
+            // Don't return - continue processing future updates
+            continue;
           }
-          
+
           if (message.value) {
             likesCount++;
             likesBatch.push(message.value);
-            
+
             if (likesBatch.length >= BATCH_SIZE) {
               await flushBatch('item_likes', likesBatch, pg);
               likesBatch = [];
             }
           }
+        }
+
+        // Flush any remaining batch after processing all messages
+        if (likesBatch.length > 0) {
+          await flushBatch('item_likes', likesBatch, pg);
+          likesBatch = [];
+          // Refresh likes when new data arrives
+          await refreshLikes();
         }
       },
       (error) => {
