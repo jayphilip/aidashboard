@@ -6,6 +6,7 @@ const STORAGE_KEY = 'aidashboard_filter_preferences';
 interface StoredFilterPreferences {
   sourceTypes: string[];
   topics: string[];
+  sourceIds: number[];
   dateRange: {
     start: string | null;
     end: string | null;
@@ -34,6 +35,7 @@ export function useFilterPreferences() {
       const toStore: StoredFilterPreferences = {
         sourceTypes: filters.sourceTypes,
         topics: filters.topics,
+        sourceIds: filters.sourceIds,
         dateRange: filters.dateRange,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));

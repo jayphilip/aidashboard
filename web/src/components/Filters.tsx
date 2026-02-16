@@ -10,10 +10,13 @@ import {
 } from '@chakra-ui/react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { getAllTopics } from '@/lib/items';
+import { getActiveSources } from '@/lib/sources';
+import type { Source } from '@/lib/sources';
 
 export interface FilterOptions {
   sourceTypes: string[];
   topics: string[];
+  sourceIds: number[];
   dateRange: {
     start: string | null;
     end: string | null;
@@ -42,6 +45,9 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
   const [selectedTopics, setSelectedTopics] = useState<string[]>(
     initialFilters?.topics || []
   );
+  const [selectedSourceIds, setSelectedSourceIds] = useState<number[]>(
+    initialFilters?.sourceIds || []
+  );
   const [dateStart, setDateStart] = useState<string>(
     initialFilters?.dateRange?.start || ''
   );
@@ -52,14 +58,19 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
     initialFilters?.readStatus || 'all'
   );
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [availableSources, setAvailableSources] = useState<Source[]>([]);
 
-  // Load available topics
+  // Load available topics and sources
   useEffect(() => {
-    async function loadTopics() {
-      const topics = await getAllTopics();
+    async function loadFilters() {
+      const [topics, sources] = await Promise.all([
+        getAllTopics(),
+        getActiveSources(),
+      ]);
       setAvailableTopics(topics);
+      setAvailableSources(sources);
     }
-    loadTopics();
+    loadFilters();
   }, []);
 
   // Notify parent of filter changes
@@ -67,17 +78,19 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
     onFilterChange({
       sourceTypes,
       topics: selectedTopics,
+      sourceIds: selectedSourceIds,
       dateRange: {
         start: dateStart || null,
         end: dateEnd || null,
       },
       readStatus,
     });
-  }, [sourceTypes, selectedTopics, dateStart, dateEnd, readStatus, onFilterChange]);
+  }, [sourceTypes, selectedTopics, selectedSourceIds, dateStart, dateEnd, readStatus, onFilterChange]);
 
   const handleClearFilters = () => {
     setSourceTypes([]);
     setSelectedTopics([]);
+    setSelectedSourceIds([]);
     setDateStart('');
     setDateEnd('');
     setReadStatus('all');
@@ -99,9 +112,18 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
     );
   };
 
+  const toggleSource = (sourceId: number) => {
+    setSelectedSourceIds(prev =>
+      prev.includes(sourceId)
+        ? prev.filter(id => id !== sourceId)
+        : [...prev, sourceId]
+    );
+  };
+
   const activeFilterCount =
     sourceTypes.length +
     selectedTopics.length +
+    selectedSourceIds.length +
     (dateStart || dateEnd ? 1 : 0) +
     (readStatus !== 'all' ? 1 : 0);
 
@@ -226,6 +248,74 @@ export default function Filters({ onFilterChange, initialFilters }: FiltersProps
                 ))}
               </Flex>
             </Box>
+
+            {/* Sources */}
+            {availableSources.length > 0 && (
+              <Box>
+                <Text
+                  color="gray.400"
+                  fontSize="xs"
+                  mb={3}
+                  fontWeight="bold"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                >
+                  Sources
+                </Text>
+                <Flex gap={2.5} wrap="wrap" maxH="200px" overflowY="auto" css={{
+                  '&::-webkit-scrollbar': {
+                    width: '8px',
+                  },
+                  '&::-webkit-scrollbar-track': {
+                    background: 'var(--chakra-colors-gray-800)',
+                    borderRadius: '4px',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: 'var(--chakra-colors-gray-600)',
+                    borderRadius: '4px',
+                  },
+                  '&::-webkit-scrollbar-thumb:hover': {
+                    background: 'var(--chakra-colors-gray-500)',
+                  },
+                }}>
+                  {availableSources.map((source) => (
+                    <Flex
+                      key={source.id}
+                      as="label"
+                      align="center"
+                      gap={2}
+                      cursor="pointer"
+                      px={3}
+                      py={1.5}
+                      rounded="md"
+                      bg={selectedSourceIds.includes(source.id) ? 'blue.900' : 'gray.800'}
+                      borderWidth="1px"
+                      borderColor={selectedSourceIds.includes(source.id) ? 'blue.600' : 'gray.700'}
+                      _hover={{
+                        bg: selectedSourceIds.includes(source.id) ? 'blue.800' : 'gray.750',
+                        borderColor: selectedSourceIds.includes(source.id) ? 'blue.500' : 'gray.600',
+                      }}
+                      transition="all 0.2s"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedSourceIds.includes(source.id)}
+                        onChange={() => toggleSource(source.id)}
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          cursor: 'pointer',
+                          accentColor: 'var(--chakra-colors-blue-500)',
+                        }}
+                      />
+                      <Text fontSize="sm" color="gray.200">
+                        {source.name}
+                      </Text>
+                    </Flex>
+                  ))}
+                </Flex>
+              </Box>
+            )}
 
             {/* Topics */}
             {availableTopics.length > 0 && (

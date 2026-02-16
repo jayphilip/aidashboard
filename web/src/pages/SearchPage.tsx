@@ -35,13 +35,14 @@ export default function SearchPage() {
   // Initialize filters from URL params on mount, fallback to saved preferences
   const initialFiltersFromUrl = useMemo(() => {
     const urlFilters = paramsToFilters(searchParams);
-    const hasUrlFilters = urlFilters.sourceTypes || urlFilters.topics || urlFilters.dateRange;
+    const hasUrlFilters = urlFilters.sourceTypes || urlFilters.topics || urlFilters.sourceIds || urlFilters.dateRange;
 
     // If URL has filters, use them; otherwise use saved preferences
     if (hasUrlFilters) {
       return {
         sourceTypes: urlFilters.sourceTypes || [],
         topics: urlFilters.topics || [],
+        sourceIds: urlFilters.sourceIds || [],
         dateRange: {
           start: urlFilters.dateRange?.start
             ? urlFilters.dateRange.start.toISOString().split('T')[0]
@@ -58,6 +59,7 @@ export default function SearchPage() {
       return {
         sourceTypes: [],
         topics: [],
+        sourceIds: [],
         dateRange: { start: null, end: null },
         readStatus: 'all' as const,
       };
@@ -76,6 +78,7 @@ export default function SearchPage() {
     const searchOptions = {
       sourceTypes: newFilters.sourceTypes.length > 0 ? newFilters.sourceTypes : undefined,
       topics: newFilters.topics.length > 0 ? newFilters.topics : undefined,
+      sourceIds: newFilters.sourceIds.length > 0 ? newFilters.sourceIds : undefined,
       dateRange: (newFilters.dateRange.start || newFilters.dateRange.end) ? {
         start: newFilters.dateRange.start ? new Date(newFilters.dateRange.start) : undefined,
         end: newFilters.dateRange.end ? new Date(newFilters.dateRange.end) : undefined,
@@ -93,6 +96,7 @@ export default function SearchPage() {
     const newFilters = {
       sourceTypes: urlFilters.sourceTypes || [],
       topics: urlFilters.topics || [],
+      sourceIds: urlFilters.sourceIds || [],
       dateRange: {
         start: urlFilters.dateRange?.start
           ? urlFilters.dateRange.start.toISOString().split('T')[0]
@@ -118,6 +122,7 @@ export default function SearchPage() {
         const hasActiveFilters =
           filters.sourceTypes.length > 0 ||
           filters.topics.length > 0 ||
+          filters.sourceIds.length > 0 ||
           filters.dateRange.start !== null ||
           filters.dateRange.end !== null;
 
@@ -129,6 +134,7 @@ export default function SearchPage() {
             {
               sourceTypes: filters.sourceTypes.length > 0 ? filters.sourceTypes : undefined,
               topics: filters.topics.length > 0 ? filters.topics : undefined,
+              sourceIds: filters.sourceIds.length > 0 ? filters.sourceIds : undefined,
               dateRange:
                 filters.dateRange.start || filters.dateRange.end
                   ? {
