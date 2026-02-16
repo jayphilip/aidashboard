@@ -21,6 +21,7 @@ interface ItemsContextType extends ItemsState {
   waitForSync: () => Promise<void>;
   refreshLikes: () => Promise<void>;
   refreshReads: () => Promise<void>;
+  refreshSources: () => Promise<void>;
   markAsRead: (itemId: string) => Promise<void>;
   markAsUnread: (itemId: string) => Promise<void>;
 }
@@ -107,6 +108,17 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       logger.warn('Failed to refresh reads:', err);
     }
   }, [userId]);
+
+  const refreshSources = useCallback(async () => {
+    try {
+      const db = await getDb();
+      const allSources = await db.select().from(sources);
+      const sourcesMap = new Map(allSources.map(s => [s.id, s.name]));
+      setState(prev => ({ ...prev, sourcesMap }));
+    } catch (err) {
+      logger.warn('Failed to refresh sources:', err);
+    }
+  }, []);
 
   const markAsRead = useCallback(async (itemId: string) => {
     try {
@@ -510,7 +522,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
   }, [initializeSync]);
 
   return (
-    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes, refreshReads, markAsRead, markAsUnread }}>
+    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes, refreshReads, refreshSources, markAsRead, markAsUnread }}>
       {children}
     </ItemsContext.Provider>
   );

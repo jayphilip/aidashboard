@@ -466,6 +466,8 @@ export default function SourcesPage() {
             } else {
               await createSource(payload as any);
             }
+            // Wait a bit for Electric to sync the change from server
+            await new Promise(resolve => setTimeout(resolve, 1500));
             await reloadSources();
           }}
         />
