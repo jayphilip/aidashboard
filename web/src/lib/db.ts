@@ -9,6 +9,7 @@ const SCHEMA_VERSION = 3;
 // Singleton-style promises so we only initialise once per tab
 let pglitePromise: Promise<PGlite> | null = null;
 let dbPromise: Promise<ReturnType<typeof drizzle>> | null = null;
+let isInitializing = false;
 
 async function checkSchemaVersion(): Promise<boolean> {
   const storedVersion = localStorage.getItem('aidashboard_schema_version');
@@ -39,16 +40,36 @@ async function checkSchemaVersion(): Promise<boolean> {
 }
 
 export async function getPGlite() {
-  if (!pglitePromise) {
+  if (pglitePromise) {
+    return pglitePromise;
+  }
+
+  // Wait if another call is already initializing
+  if (isInitializing) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return getPGlite(); // Retry after waiting
+  }
+
+  isInitializing = true;
+
+  try {
     // Check and clear if needed before creating new instance
     await checkSchemaVersion();
-    
+
     pglitePromise = PGlite.create({
       dataDir: 'idb://aidashboard',
       // No extensions needed - we'll use ShapeStream directly in ItemsContext
+    }).catch(err => {
+      console.error('[DB] Failed to create PGlite:', err);
+      // Reset on error so it can be retried
+      pglitePromise = null;
+      throw err;
     });
+
+    return pglitePromise;
+  } finally {
+    isInitializing = false;
   }
-  return pglitePromise;
 }
 
 export function getDb() {
