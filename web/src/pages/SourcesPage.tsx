@@ -9,7 +9,6 @@ import {
   Box,
   Container,
   Flex,
-  Heading,
   Text,
   Badge,
   Grid,
@@ -91,32 +90,7 @@ export default function SourcesPage() {
   return (
     <ErrorBoundary>
       <Box minH="100vh" bg="gray.950" color="white">
-        <Box
-          bg="gray.900"
-          borderBottomWidth="1px"
-          borderColor="gray.800"
-          py={12}
-          mb={8}
-        >
-          <Container maxW="7xl">
-            <Flex direction="column" align="center" textAlign="center" gap={4}>
-              <Heading
-                size="2xl"
-                bgGradient="linear(to-r, orange.400, yellow.400)"
-                bgClip="text"
-                fontWeight="black"
-                letterSpacing="tight"
-              >
-                Content Sources
-              </Heading>
-              <Text color="gray.400" fontSize="lg" maxW="2xl">
-                Your configured AI content sources and ingestion endpoints
-              </Text>
-            </Flex>
-          </Container>
-        </Box>
-
-        <Container maxW="7xl" pb={12}>
+        <Container maxW="7xl" py={8}>
           <Flex justify="flex-end" mb={6}>
             <Button
               colorScheme="orange"
