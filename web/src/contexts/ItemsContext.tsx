@@ -473,6 +473,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
           if (message.value) {
             sourcesCount++;
+            console.log('[ItemsSync] sources: Received source data:', message.value);
             sourcesBatch.push(message.value);
 
             if (sourcesBatch.length >= BATCH_SIZE) {
@@ -484,10 +485,12 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
 
         // Flush any remaining batch after processing all messages
         if (sourcesBatch.length > 0) {
+          console.log(`[ItemsSync] sources: Flushing final batch of ${sourcesBatch.length} sources`);
           await flushBatch('sources', sourcesBatch, pg);
           sourcesBatch = [];
           // Refresh sources map when new data arrives
           await loadAuxiliaryData();
+          console.log('[ItemsSync] sources: Refreshed auxiliary data after sync');
         }
       },
       (error) => {
