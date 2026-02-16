@@ -141,30 +141,41 @@ export async function searchItems(options: SearchOptions, userId: string): Promi
     offset = 0,
   } = options;
 
+  // Try full-text search first, fall back to LIKE if it fails
+  let useFullTextSearch = false;
+  if (query && query.trim()) {
+    try {
+      // Test if we can use full-text search by trying a simple query
+      await db.execute(sql`SELECT 1 WHERE ${items.searchVector} @@ plainto_tsquery('english', 'test')`);
+      useFullTextSearch = true;
+      console.log('[searchItems] Using full-text search for query:', query);
+    } catch (err) {
+      useFullTextSearch = false;
+      console.log('[searchItems] Full-text search not available, using LIKE search for query:', query);
+    }
+  }
+
   // Build WHERE conditions
   const conditions: any[] = [];
 
-  // Text search - try full-text search first, fall back to LIKE if column doesn't exist
+  // Text search
   if (query && query.trim()) {
-    console.log('[searchItems] Searching for query:', query);
-    // Try full-text search (will fail gracefully if search_vector doesn't exist)
-    const searchPattern = `%${query.toLowerCase()}%`;
-    conditions.push(
-      sql`(
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM information_schema.columns
-            WHERE table_name = 'items' AND column_name = 'search_vector'
-          )
-          THEN ${items.searchVector} @@ plainto_tsquery('english', ${query})
-          ELSE (
-            LOWER(${items.title}) LIKE ${searchPattern}
-            OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
-            OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
-          )
-        END
-      )`
-    );
+    if (useFullTextSearch) {
+      // Use full-text search
+      conditions.push(
+        sql`${items.searchVector} @@ plainto_tsquery('english', ${query})`
+      );
+    } else {
+      // Fall back to LIKE search
+      const searchPattern = `%${query.toLowerCase()}%`;
+      conditions.push(
+        sql`(
+          LOWER(${items.title}) LIKE ${searchPattern}
+          OR COALESCE(LOWER(${items.summary}), '') LIKE ${searchPattern}
+          OR COALESCE(LOWER(${items.body}), '') LIKE ${searchPattern}
+        )`
+      );
+    }
   }
 
   // Filter by source types
