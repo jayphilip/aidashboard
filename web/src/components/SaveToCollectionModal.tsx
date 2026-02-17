@@ -121,6 +121,7 @@ export default function SaveToCollectionModal({
 
   const modal = (
     <div
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         inset: 0,

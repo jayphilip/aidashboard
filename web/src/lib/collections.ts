@@ -121,17 +121,26 @@ export async function createCollection(
 ): Promise<Collection> {
   const db = await getDb();
   const now = new Date();
+  const trimmedName = name.trim();
 
-  const rows = await db
+  // Plain insert — avoid .returning() which can hang in PGlite
+  await db
     .insert(collections)
     .values({
       userId,
-      name: name.trim(),
+      name: trimmedName,
       description: description?.trim() || null,
       createdAt: now,
       updatedAt: now,
-    } as any)
-    .returning();
+    } as any);
+
+  // Fetch the row we just inserted
+  const rows = await db
+    .select()
+    .from(collections)
+    .where(and(eq(collections.userId, userId), eq(collections.name, trimmedName)))
+    .orderBy(desc(collections.createdAt))
+    .limit(1);
 
   return rows[0] as Collection;
 }
@@ -147,7 +156,7 @@ export async function updateCollection(
   try {
     const db = await getDb();
 
-    const rows = await db
+    await db
       .update(collections)
       .set({
         ...(updates.name !== undefined ? { name: updates.name.trim() } : {}),
@@ -156,8 +165,13 @@ export async function updateCollection(
           : {}),
         updatedAt: new Date(),
       })
+      .where(and(eq(collections.id, collectionId), eq(collections.userId, userId)));
+
+    const rows = await db
+      .select()
+      .from(collections)
       .where(and(eq(collections.id, collectionId), eq(collections.userId, userId)))
-      .returning();
+      .limit(1);
 
     return rows.length > 0 ? (rows[0] as Collection) : null;
   } catch (err) {
