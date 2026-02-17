@@ -21,9 +21,22 @@ fn strip_html(html: &str) -> String {
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&amp;", "&")
+        // Typographic punctuation
+        .replace("&mdash;", "—")
+        .replace("&ndash;", "–")
+        .replace("&hellip;", "…")
+        .replace("&lsquo;", "'")
+        .replace("&rsquo;", "'")
+        .replace("&ldquo;", "\u{201C}")
+        .replace("&rdquo;", "\u{201D}")
+        // Numeric equivalents
         .replace("&#8217;", "'")
-        .replace("&#8220;", "\"")
-        .replace("&#8221;", "\"");
+        .replace("&#8216;", "'")
+        .replace("&#8220;", "\u{201C}")
+        .replace("&#8221;", "\u{201D}")
+        .replace("&#8212;", "—")
+        .replace("&#8211;", "–")
+        .replace("&#8230;", "…");
 
     // Collapse multiple spaces and trim
     let re_spaces = regex::Regex::new(r"\s+").unwrap();
@@ -122,6 +135,17 @@ fn entry_to_item(entry: feed_rs::model::Entry, source: &crate::models::Source) -
 
     // If no URL found, skip this entry
     let url = url?;
+
+    // Normalize double-slash paths (e.g. https://example.com//2023/... → https://example.com/2023/...)
+    let url = {
+        if let Some(rest) = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")) {
+            let scheme = if url.starts_with("https") { "https://" } else { "http://" };
+            let normalized = regex::Regex::new(r"/{2,}").unwrap().replace_all(rest, "/").to_string();
+            format!("{}{}", scheme, normalized)
+        } else {
+            url
+        }
+    };
 
     // Extract summary (strip HTML)
     let summary = entry
