@@ -1,10 +1,10 @@
 // web/src/lib/db.ts
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
-import { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences } from './schema';
+import { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences, collections, collectionItems } from './schema';
 
 // Schema version - increment when schema changes to force client DB reset
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // Singleton-style promises so we only initialise once per tab
 let pglitePromise: Promise<PGlite> | null = null;
@@ -167,6 +167,23 @@ export function getDb() {
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS collections (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS collection_items (
+          id SERIAL PRIMARY KEY,
+          collection_id INTEGER NOT NULL,
+          item_id UUID NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(collection_id, item_id)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sources_active ON sources(active);
         CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(type);
         CREATE INDEX IF NOT EXISTS idx_sources_medium ON sources(medium);
@@ -188,9 +205,13 @@ export function getDb() {
         CREATE INDEX IF NOT EXISTS idx_items_source_id_published ON items(source_id, published_at DESC);
         CREATE INDEX IF NOT EXISTS idx_item_topics_item_topic ON item_topics(item_id, topic);
         CREATE INDEX IF NOT EXISTS idx_item_likes_user_item ON item_likes(user_id, item_id);
+        CREATE INDEX IF NOT EXISTS idx_collections_user_id ON collections(user_id);
+        CREATE INDEX IF NOT EXISTS idx_collection_items_collection_id ON collection_items(collection_id);
+        CREATE INDEX IF NOT EXISTS idx_collection_items_item_id ON collection_items(item_id);
+        CREATE INDEX IF NOT EXISTS idx_collection_items_collection_item ON collection_items(collection_id, item_id);
       `);
 
-      return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences } });
+      return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences, collections, collectionItems } });
     })();
   }
   return dbPromise;

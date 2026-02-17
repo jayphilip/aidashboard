@@ -7,8 +7,9 @@ import { useUser } from '@/contexts/UserContext';
 import { useItems } from '@/contexts/ItemsContext';
 import { formatDate, excerpt } from '@/utils/formatting';
 import { logger } from '@/utils/logger';
-import { ExternalLink, ThumbsUp, ThumbsDown, FileText, Twitter, PenTool, Mail } from 'lucide-react';
+import { ExternalLink, ThumbsUp, ThumbsDown, FileText, Twitter, PenTool, Mail, Bookmark } from 'lucide-react';
 import type { Item } from '@/lib/items';
+import SaveToCollectionModal from './SaveToCollectionModal';
 
 interface ItemCardProps {
   item: Item;
@@ -45,6 +46,7 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
   const { markAsRead } = useItems();
   const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
 
   async function toggleLike(score: number) {
     if (loading) return;
@@ -230,6 +232,24 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           </Button>
           <Button
             size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSaveModalOpen(true);
+            }}
+            bg="gray.700"
+            color="white"
+            flex={1}
+            fontSize="xs"
+            _hover={{
+              bg: 'gray.600',
+              transform: 'scale(1.05)',
+            }}
+            aria-label="Save to collection"
+          >
+            <Bookmark size={16} />
+          </Button>
+          <Button
+            size="sm"
             onClick={handleExternalLinkClick}
             bgGradient={gradient}
             color="white"
@@ -244,6 +264,13 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           </Button>
         </Flex>
       </Box>
+
+      <SaveToCollectionModal
+        isOpen={saveModalOpen}
+        onClose={() => setSaveModalOpen(false)}
+        itemId={item.id}
+        itemTitle={item.title}
+      />
     </Box>
   );
 });

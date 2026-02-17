@@ -1,6 +1,6 @@
 import { Box, Flex, Link as ChakraLink, Heading, Container } from '@chakra-ui/react';
 import { Link, useLocation } from 'react-router-dom';
-import { Newspaper, TrendingUp, Settings } from 'lucide-react';
+import { Newspaper, TrendingUp, Settings, Bookmark } from 'lucide-react';
 import SearchBar from './SearchBar';
 
 export default function Navigation() {
@@ -82,6 +82,7 @@ export default function Navigation() {
           <Flex gap={2} flexShrink={0} order={{ base: 2, md: 3 }}>
             <NavLink to="/today" icon={Newspaper}>Today</NavLink>
             <NavLink to="/topics" icon={TrendingUp}>Trends</NavLink>
+            <NavLink to="/collections" icon={Bookmark}>Collections</NavLink>
             <NavLink to="/sources" icon={Settings}>Sources</NavLink>
           </Flex>
         </Flex>

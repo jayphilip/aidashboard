@@ -6,6 +6,7 @@ import SearchPage from './pages/SearchPage';
 import TopicsPage from './pages/TopicsPage';
 import SourcesPage from './pages/SourcesPage';
 import CardPreviewPage from './pages/CardPreviewPage';
+import CollectionsPage from './pages/CollectionsPage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/topics" element={<TopicsPage />} />
             <Route path="/sources" element={<SourcesPage />} />
+            <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/card-preview" element={<CardPreviewPage />} />
           </Routes>
         </Layout>

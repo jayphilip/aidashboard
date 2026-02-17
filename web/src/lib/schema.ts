@@ -130,3 +130,21 @@ export const userPreferences = pgTable('user_preferences', {
   createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
 });
+
+// Collections - user-created named lists of saved items
+export const collections = pgTable('collections', {
+  id: serial('id').primaryKey().notNull(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
+});
+
+// Collection items - items saved to a collection
+export const collectionItems = pgTable('collection_items', {
+  id: serial('id').primaryKey().notNull(),
+  collectionId: integer('collection_id').notNull(),
+  itemId: uuid('item_id').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
+});
