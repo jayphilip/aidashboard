@@ -80,9 +80,22 @@ export async function getCollectionWithItems(
       return { ...collection, items: [] };
     }
 
-    // Fetch all items
+    // Fetch all items — explicit column select to avoid missing search_vector in PGlite
     const itemRows = await db
-      .select()
+      .select({
+        id: items.id,
+        sourceId: items.sourceId,
+        sourceType: items.sourceType,
+        title: items.title,
+        url: items.url,
+        summary: items.summary,
+        body: items.body,
+        publishedAt: items.publishedAt,
+        rawMetadata: items.rawMetadata,
+        topics: items.topics,
+        createdAt: items.createdAt,
+        updatedAt: items.updatedAt,
+      })
       .from(items)
       .where(
         itemIds.length === 1

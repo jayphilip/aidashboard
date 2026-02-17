@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box,
-  Button,
-  Flex,
-  Text,
-  VStack,
-  HStack,
-  Input,
-  Textarea,
-  Spinner,
-  Badge,
-} from '@chakra-ui/react';
-import { BookmarkCheck, Bookmark, X, FolderPlus } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Spinner } from '@chakra-ui/react';
+import { Bookmark, X, FolderPlus, Check } from 'lucide-react';
 import { useUser } from '@/contexts/UserContext';
 import {
   getUserCollections,
@@ -36,26 +26,26 @@ export default function SaveToCollectionModal({
   itemTitle,
 }: SaveToCollectionModalProps) {
   const { userId } = useUser();
-  const [collections, setCollections] = useState<CollectionWithCount[]>([]);
+  const [colList, setColList] = useState<CollectionWithCount[]>([]);
   const [savedColIds, setSavedColIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newDesc, setNewDesc] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [cols, savedIds] = await Promise.all([
         getUserCollections(userId),
         getCollectionsForItem(itemId, userId),
       ]);
-      setCollections(cols);
+      setColList(cols);
       setSavedColIds(new Set(savedIds));
-    } catch (err) {
+    } catch {
       setError('Failed to load collections');
     } finally {
       setLoading(false);
@@ -67,30 +57,39 @@ export default function SaveToCollectionModal({
       void load();
       setShowNewForm(false);
       setNewName('');
-      setNewDesc('');
       setError(null);
     }
   }, [isOpen, load]);
 
+  // Lock body scroll while open
+  useEffect(() => {
+    if (isOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [isOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   async function toggleCollection(colId: number, isSaved: boolean) {
+    if (saving !== null) return;
     setSaving(colId);
     try {
       if (isSaved) {
         await removeItemFromCollection(colId, itemId);
-        setSavedColIds((prev) => {
-          const next = new Set(prev);
-          next.delete(colId);
-          return next;
-        });
-        setCollections((prev) =>
-          prev.map((c) => (c.id === colId ? { ...c, itemCount: c.itemCount - 1 } : c))
-        );
+        setSavedColIds((prev) => { const n = new Set(prev); n.delete(colId); return n; });
+        setColList((prev) => prev.map((c) => c.id === colId ? { ...c, itemCount: c.itemCount - 1 } : c));
       } else {
         await addItemToCollection(colId, itemId);
         setSavedColIds((prev) => new Set([...prev, colId]));
-        setCollections((prev) =>
-          prev.map((c) => (c.id === colId ? { ...c, itemCount: c.itemCount + 1 } : c))
-        );
+        setColList((prev) => prev.map((c) => c.id === colId ? { ...c, itemCount: c.itemCount + 1 } : c));
       }
     } catch {
       setError('Failed to update collection');
@@ -105,14 +104,12 @@ export default function SaveToCollectionModal({
     setCreating(true);
     setError(null);
     try {
-      const col = await createCollection(userId, newName.trim(), newDesc.trim() || undefined);
-      // Also add the item immediately
+      const col = await createCollection(userId, newName.trim());
       await addItemToCollection(col.id, itemId);
       setSavedColIds((prev) => new Set([...prev, col.id]));
-      setCollections((prev) => [{ ...col, itemCount: 1 }, ...prev]);
+      setColList((prev) => [{ ...col, itemCount: 1 }, ...prev]);
       setShowNewForm(false);
       setNewName('');
-      setNewDesc('');
     } catch {
       setError('Failed to create collection');
     } finally {
@@ -122,280 +119,353 @@ export default function SaveToCollectionModal({
 
   if (!isOpen) return null;
 
-  return (
-    <>
+  const modal = (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+      }}
+    >
       {/* Backdrop */}
-      <Box
-        position="fixed"
-        inset={0}
-        bg="blackAlpha.700"
-        zIndex={1000}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.75)',
+          backdropFilter: 'blur(2px)',
+        }}
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <Box
-        position="fixed"
-        top="50%"
-        left="50%"
-        transform="translate(-50%, -50%)"
-        zIndex={1001}
-        w={{ base: '90vw', sm: '420px' }}
-        maxH="80vh"
-        bg="gray.900"
-        borderWidth="1px"
-        borderColor="gray.700"
-        rounded="xl"
-        shadow="2xl"
-        display="flex"
-        flexDirection="column"
+      {/* Panel */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          maxWidth: '400px',
+          background: '#111827',
+          border: '1px solid #374151',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '85vh',
+          overflow: 'hidden',
+        }}
       >
-        {/* Header */}
-        <Flex
-          align="center"
-          justify="space-between"
-          p={4}
-          borderBottomWidth="1px"
-          borderColor="gray.700"
-          flexShrink={0}
+        {/* ── Header ── */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 16px 12px',
+            borderBottom: '1px solid #1f2937',
+          }}
         >
-          <HStack gap={2}>
-            <Bookmark size={18} color="#60a5fa" />
-            <Text fontWeight="bold" fontSize="md" color="white">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Bookmark size={16} color="#60a5fa" />
+            <span style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>
               Save to Collection
-            </Text>
-          </HStack>
-          <Button
-            size="sm"
-            variant="ghost"
-            color="gray.400"
-            _hover={{ color: 'white', bg: 'gray.800' }}
+            </span>
+          </div>
+          <button
             onClick={onClose}
-            aria-label="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#6b7280',
+              padding: 4,
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'white'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = '#6b7280'; }}
           >
             <X size={16} />
-          </Button>
-        </Flex>
+          </button>
+        </div>
 
-        {/* Item title preview */}
-        <Box px={4} pt={3} pb={0} flexShrink={0}>
-          <Text fontSize="xs" color="gray.500" mb={1}>
-            Saving:
-          </Text>
-          <Text
-            fontSize="sm"
-            color="gray.300"
-            lineHeight="1.4"
+        {/* ── Item title ── */}
+        <div
+          style={{
+            padding: '10px 16px 10px',
+            borderBottom: '1px solid #1f2937',
+            background: '#0f172a',
+          }}
+        >
+          <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Saving item
+          </div>
+          <div
             style={{
+              fontSize: 13,
+              color: '#d1d5db',
+              lineHeight: '1.4',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-            }}
+            } as React.CSSProperties}
           >
             {itemTitle}
-          </Text>
-        </Box>
+          </div>
+        </div>
 
-        {/* Error */}
+        {/* ── Error ── */}
         {error && (
-          <Box px={4} pt={2} flexShrink={0}>
-            <Text fontSize="xs" color="red.400">
-              {error}
-            </Text>
-          </Box>
+          <div style={{ padding: '8px 16px', background: 'rgba(239,68,68,0.1)', borderBottom: '1px solid rgba(239,68,68,0.2)' }}>
+            <span style={{ fontSize: 12, color: '#f87171' }}>{error}</span>
+          </div>
         )}
 
-        {/* Collections list */}
-        <Box flex={1} overflowY="auto" px={4} py={3}>
+        {/* ── Collections list ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
           {loading ? (
-            <Flex justify="center" py={6}>
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
               <Spinner size="sm" color="blue.400" />
-            </Flex>
-          ) : collections.length === 0 && !showNewForm ? (
-            <Flex
-              direction="column"
-              align="center"
-              gap={3}
-              py={6}
-              color="gray.500"
-            >
-              <Bookmark size={32} />
-              <Text fontSize="sm">No collections yet</Text>
-            </Flex>
+            </div>
+          ) : colList.length === 0 && !showNewForm ? (
+            <div style={{ textAlign: 'center', padding: '24px 0', color: '#4b5563' }}>
+              <Bookmark size={28} style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontSize: 13 }}>No collections yet</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Create one below</div>
+            </div>
           ) : (
-            <VStack align="stretch" gap={1}>
-              {collections.map((col) => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {colList.map((col) => {
                 const isSaved = savedColIds.has(col.id);
                 const isSaving = saving === col.id;
                 return (
-                  <Flex
+                  <button
                     key={col.id}
-                    align="center"
-                    gap={3}
-                    p={2.5}
-                    rounded="lg"
-                    bg={isSaved ? 'blue.900' : 'gray.800'}
-                    borderWidth="1px"
-                    borderColor={isSaved ? 'blue.700' : 'gray.700'}
-                    cursor="pointer"
-                    _hover={{ borderColor: isSaved ? 'blue.600' : 'gray.500' }}
-                    transition="all 0.15s"
-                    onClick={() => !isSaving && toggleCollection(col.id, isSaved)}
+                    onClick={() => toggleCollection(col.id, isSaved)}
+                    disabled={isSaving}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '9px 10px',
+                      borderRadius: 10,
+                      border: `1px solid ${isSaved ? '#1d4ed8' : '#374151'}`,
+                      background: isSaved ? 'rgba(29,78,216,0.15)' : 'rgba(31,41,55,0.6)',
+                      cursor: isSaving ? 'default' : 'pointer',
+                      width: '100%',
+                      textAlign: 'left',
+                      transition: 'all 0.12s',
+                      opacity: isSaving ? 0.7 : 1,
+                    }}
                   >
-                    {isSaving ? (
-                      <Spinner size="xs" color="blue.400" flexShrink={0} />
-                    ) : isSaved ? (
-                      <BookmarkCheck size={16} color="#60a5fa" style={{ flexShrink: 0 }} />
-                    ) : (
-                      <Bookmark size={16} color="#9ca3af" style={{ flexShrink: 0 }} />
-                    )}
-                    <Box flex={1} minW={0}>
-                      <Text
-                        fontSize="sm"
-                        fontWeight="medium"
-                        color={isSaved ? 'blue.300' : 'white'}
+                    {/* Icon box */}
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: isSaved ? 'rgba(37,99,235,0.3)' : '#374151',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isSaving ? (
+                        <Spinner size="xs" color="blue.400" />
+                      ) : isSaved ? (
+                        <Check size={14} color="#60a5fa" />
+                      ) : (
+                        <Bookmark size={13} color="#9ca3af" />
+                      )}
+                    </div>
+
+                    {/* Name + desc */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
                         style={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 1,
-                          WebkitBoxOrient: 'vertical',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: isSaved ? '#93c5fd' : '#f3f4f6',
                           overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {col.name}
-                      </Text>
+                      </div>
                       {col.description && (
-                        <Text
-                          fontSize="xs"
-                          color="gray.500"
+                        <div
                           style={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 1,
-                            WebkitBoxOrient: 'vertical',
+                            fontSize: 11,
+                            color: '#6b7280',
                             overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
                           }}
                         >
                           {col.description}
-                        </Text>
+                        </div>
                       )}
-                    </Box>
-                    <Badge
-                      bg="gray.700"
-                      color="gray.400"
-                      fontSize="xs"
-                      px={2}
-                      rounded="md"
-                      flexShrink={0}
+                    </div>
+
+                    {/* Count pill */}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: isSaved ? '#60a5fa' : '#6b7280',
+                        background: isSaved ? 'rgba(37,99,235,0.2)' : '#1f2937',
+                        border: `1px solid ${isSaved ? '#1d4ed8' : '#374151'}`,
+                        borderRadius: 20,
+                        padding: '1px 8px',
+                        flexShrink: 0,
+                        minWidth: 24,
+                        textAlign: 'center',
+                        fontWeight: 500,
+                      }}
                     >
                       {col.itemCount}
-                    </Badge>
-                  </Flex>
+                    </div>
+                  </button>
                 );
               })}
-            </VStack>
+            </div>
           )}
 
-          {/* New collection form */}
+          {/* New collection inline form */}
           {showNewForm && (
-            <Box
-              mt={collections.length > 0 ? 3 : 0}
-              p={3}
-              bg="gray.800"
-              borderWidth="1px"
-              borderColor="blue.700"
-              rounded="lg"
+            <form
+              onSubmit={handleCreate}
+              style={{
+                marginTop: colList.length > 0 ? 8 : 0,
+                padding: '10px',
+                background: 'rgba(37,99,235,0.08)',
+                border: '1px solid rgba(37,99,235,0.4)',
+                borderRadius: 10,
+              }}
             >
-              <form onSubmit={handleCreate}>
-                <VStack align="stretch" gap={2}>
-                  <Text fontSize="xs" fontWeight="semibold" color="blue.400">
-                    New Collection
-                  </Text>
-                  <Input
-                    placeholder="Collection name"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    size="sm"
-                    bg="gray.900"
-                    borderColor="gray.600"
-                    color="white"
-                    _placeholder={{ color: 'gray.500' }}
-                    _focus={{ borderColor: 'blue.500' }}
-                    autoFocus
-                    required
-                  />
-                  <Textarea
-                    placeholder="Description (optional)"
-                    value={newDesc}
-                    onChange={(e) => setNewDesc(e.target.value)}
-                    size="sm"
-                    rows={2}
-                    bg="gray.900"
-                    borderColor="gray.600"
-                    color="white"
-                    _placeholder={{ color: 'gray.500' }}
-                    _focus={{ borderColor: 'blue.500' }}
-                    resize="none"
-                  />
-                  <HStack gap={2} justify="flex-end">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      color="gray.400"
-                      onClick={() => {
-                        setShowNewForm(false);
-                        setNewName('');
-                        setNewDesc('');
-                      }}
-                      type="button"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      colorScheme="blue"
-                      type="submit"
-                      loading={creating}
-                      disabled={!newName.trim()}
-                    >
-                      Create & Save
-                    </Button>
-                  </HStack>
-                </VStack>
-              </form>
-            </Box>
+              <div style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                New collection
+              </div>
+              <input
+                autoFocus
+                required
+                placeholder="Collection name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #374151',
+                  background: '#0f172a',
+                  color: 'white',
+                  fontSize: 13,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#374151'; }}
+              />
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowNewForm(false); setNewName(''); }}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 7,
+                    border: '1px solid #374151',
+                    background: 'transparent',
+                    color: '#9ca3af',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newName.trim() || creating}
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: 7,
+                    border: 'none',
+                    background: newName.trim() ? '#2563eb' : '#1e3a8a',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: newName.trim() ? 'pointer' : 'default',
+                    opacity: creating ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  {creating ? <Spinner size="xs" /> : <><Check size={12} />&nbsp;Create &amp; Save</>}
+                </button>
+              </div>
+            </form>
           )}
-        </Box>
+        </div>
 
-        {/* Footer */}
-        <Flex
-          p={3}
-          borderTopWidth="1px"
-          borderColor="gray.700"
-          justify="space-between"
-          align="center"
-          flexShrink={0}
+        {/* ── Footer ── */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 12px',
+            borderTop: '1px solid #1f2937',
+          }}
         >
           {!showNewForm ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              color="blue.400"
-              _hover={{ bg: 'blue.900', color: 'blue.300' }}
+            <button
               onClick={() => setShowNewForm(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 10px',
+                borderRadius: 8,
+                border: '1px solid rgba(37,99,235,0.35)',
+                background: 'transparent',
+                color: '#60a5fa',
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
             >
-              <HStack gap={1.5}>
-                <FolderPlus size={14} />
-                <span>New Collection</span>
-              </HStack>
-            </Button>
+              <FolderPlus size={13} />
+              New Collection
+            </button>
           ) : (
-            <Box />
+            <div />
           )}
-          <Button size="sm" colorScheme="blue" onClick={onClose}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '6px 18px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#2563eb',
+              color: 'white',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
             Done
-          </Button>
-        </Flex>
-      </Box>
-    </>
+          </button>
+        </div>
+      </div>
+    </div>
   );
+
+  return createPortal(modal, document.body);
 }
