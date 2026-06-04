@@ -21,11 +21,14 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
+          envs: OPENROUTER_API_KEY
           script: |
             set -e  # Exit on error
 
@@ -38,6 +41,21 @@ jobs:
             echo "📥 Pulling latest code..."
             git fetch origin main
             git reset --hard origin/main
+
+            # Sync the OpenRouter key into the VPS .env (idempotent upsert).
+            # The key is provided by the OPENROUTER_API_KEY GitHub Actions secret;
+            # it lives only in the untracked .env, which git reset does not touch.
+            if [ -n "$OPENROUTER_API_KEY" ]; then
+              echo "🔑 Setting OPENROUTER_API_KEY in .env..."
+              touch .env
+              if grep -q '^OPENROUTER_API_KEY=' .env; then
+                sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=${OPENROUTER_API_KEY}|" .env
+              else
+                echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" >> .env
+              fi
+            else
+              echo "⚠️  OPENROUTER_API_KEY secret not set; trend analysis will be skipped."
+            fi
 
             # Stop and remove all containers to avoid stale state
             echo "🛑 Stopping existing containers..."

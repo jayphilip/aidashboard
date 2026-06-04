@@ -58,6 +58,11 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
       INGESTION_INTERVAL_SECS: ${INGESTION_INTERVAL_SECS:-3600}
       ARXIV_API_URL: ${ARXIV_API_URL:-http://export.arxiv.org/api/query}
+      # Trend analysis (sourced from the VPS .env). If unset, the trend step
+      # safely skips and ingestion still runs. Free model by default.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openrouter/owl-alpha}
+      TREND_MAX_ITEMS: ${TREND_MAX_ITEMS:-80}
     depends_on:
       postgres:
         condition: service_healthy

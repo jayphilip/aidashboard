@@ -3,8 +3,11 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm. Pin the major version so the build doesn't depend on whatever
+# pnpm the base image/host resolves: pnpm 11 moved onlyBuiltDependencies out of
+# package.json and treats ignored build scripts (esbuild) as a hard error under
+# --frozen-lockfile. Pinning to 10 keeps the package.json pnpm config working.
+RUN npm install -g pnpm@10
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
