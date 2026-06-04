@@ -139,7 +139,7 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           <Icon as={SourceIconComponent} color="white" boxSize={4} />
         </Flex>
         <Box flex={1} minW={0}>
-          <Text fontSize="2xs" color="gray.400" fontWeight="semibold" noOfLines={1}>
+          <Text fontSize="2xs" color="gray.400" fontWeight="semibold" lineClamp={1}>
             {sourceName}
           </Text>
         </Box>
@@ -156,13 +156,13 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
           lineHeight="1.3"
           color={isRead ? 'gray.500' : 'white'}
           mb={2}
-          noOfLines={3}
+          lineClamp={3}
         >
           {item.title}
         </Text>
 
         {item.summary && (
-          <Text fontSize="xs" lineHeight="1.4" color="gray.400" noOfLines={3} mb={3}>
+          <Text fontSize="xs" lineHeight="1.4" color="gray.400" lineClamp={3} mb={3}>
             {excerpt(item.summary, 100)}
           </Text>
         )}

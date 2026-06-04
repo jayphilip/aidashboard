@@ -36,7 +36,7 @@ function getSourceTypeColor(sourceType: string): string {
   }
 }
 
-const CardOption1 = memo(function CardOption1({ item, sourceName = 'Unknown', initialLiked = null, onLikeChange }: CardOption1Props) {
+const CardOption1 = memo(function CardOption1({ item, initialLiked = null, onLikeChange }: CardOption1Props) {
   const { userId } = useUser();
   const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
@@ -118,13 +118,13 @@ const CardOption1 = memo(function CardOption1({ item, sourceName = 'Unknown', in
           lineHeight="1.3"
           color="gray.900"
           mb={2}
-          noOfLines={2}
+          lineClamp={2}
         >
           {item.title}
         </Text>
 
         {item.summary && (
-          <Text fontSize="xs" lineHeight="1.5" color="gray.600" mb={3} noOfLines={3}>
+          <Text fontSize="xs" lineHeight="1.5" color="gray.600" mb={3} lineClamp={3}>
             {excerpt(item.summary, 100)}
           </Text>
         )}
@@ -154,7 +154,7 @@ const CardOption1 = memo(function CardOption1({ item, sourceName = 'Unknown', in
           <Button
             size="xs"
             onClick={() => toggleLike(1)}
-            isLoading={loading}
+            loading={loading}
             variant={liked === 1 ? 'solid' : 'ghost'}
             colorScheme={liked === 1 ? 'green' : 'gray'}
             flex={1}
@@ -164,7 +164,7 @@ const CardOption1 = memo(function CardOption1({ item, sourceName = 'Unknown', in
           <Button
             size="xs"
             onClick={() => toggleLike(-1)}
-            isLoading={loading}
+            loading={loading}
             variant={liked === -1 ? 'solid' : 'ghost'}
             colorScheme={liked === -1 ? 'red' : 'gray'}
             flex={1}

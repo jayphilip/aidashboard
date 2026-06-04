@@ -36,7 +36,7 @@ function getSourceColor(sourceType: string): string {
   }
 }
 
-const CardOption3 = memo(function CardOption3({ item, sourceName = 'Unknown', initialLiked = null, onLikeChange }: CardOption3Props) {
+const CardOption3 = memo(function CardOption3({ item, initialLiked = null, onLikeChange }: CardOption3Props) {
   const { userId } = useUser();
   const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
@@ -103,7 +103,7 @@ const CardOption3 = memo(function CardOption3({ item, sourceName = 'Unknown', in
       >
         <Icon as={SourceIconComponent} color={sourceColor} boxSize={5} />
         <Box flex={1} minW={0}>
-          <Text fontSize="2xs" color="gray.500" noOfLines={1}>
+          <Text fontSize="2xs" color="gray.500" lineClamp={1}>
             {formatDate(item.publishedAt)}
           </Text>
         </Box>
@@ -117,13 +117,13 @@ const CardOption3 = memo(function CardOption3({ item, sourceName = 'Unknown', in
           lineHeight="1.3"
           color="white"
           mb={2}
-          noOfLines={3}
+          lineClamp={3}
         >
           {item.title}
         </Text>
 
         {item.summary && (
-          <Text fontSize="xs" lineHeight="1.4" color="gray.400" noOfLines={3} mb={3}>
+          <Text fontSize="xs" lineHeight="1.4" color="gray.400" lineClamp={3} mb={3}>
             {excerpt(item.summary, 90)}
           </Text>
         )}
@@ -154,7 +154,7 @@ const CardOption3 = memo(function CardOption3({ item, sourceName = 'Unknown', in
           <Button
             size="sm"
             onClick={() => toggleLike(1)}
-            isLoading={loading}
+            loading={loading}
             bg="gray.700"
             color="white"
             flex={1}
@@ -170,7 +170,7 @@ const CardOption3 = memo(function CardOption3({ item, sourceName = 'Unknown', in
           <Button
             size="sm"
             onClick={() => toggleLike(-1)}
-            isLoading={loading}
+            loading={loading}
             bg="gray.700"
             color="white"
             flex={1}

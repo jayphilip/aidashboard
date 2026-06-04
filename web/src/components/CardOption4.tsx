@@ -118,7 +118,7 @@ const CardOption4 = memo(function CardOption4({ item, sourceName = 'Unknown', in
           <Icon as={SourceIconComponent} color="white" boxSize={4} />
         </Flex>
         <Box flex={1} minW={0}>
-          <Text fontSize="2xs" color="gray.400" fontWeight="semibold" noOfLines={1}>
+          <Text fontSize="2xs" color="gray.400" fontWeight="semibold" lineClamp={1}>
             {sourceName}
           </Text>
         </Box>
@@ -135,13 +135,13 @@ const CardOption4 = memo(function CardOption4({ item, sourceName = 'Unknown', in
           lineHeight="1.3"
           color="white"
           mb={2}
-          noOfLines={3}
+          lineClamp={3}
         >
           {item.title}
         </Text>
 
         {item.summary && (
-          <Text fontSize="xs" lineHeight="1.4" color="gray.400" noOfLines={3} mb={3}>
+          <Text fontSize="xs" lineHeight="1.4" color="gray.400" lineClamp={3} mb={3}>
             {excerpt(item.summary, 100)}
           </Text>
         )}
@@ -174,7 +174,7 @@ const CardOption4 = memo(function CardOption4({ item, sourceName = 'Unknown', in
           <Button
             size="sm"
             onClick={() => toggleLike(1)}
-            isLoading={loading}
+            loading={loading}
             bg="gray.700"
             color="white"
             flex={1}
@@ -190,7 +190,7 @@ const CardOption4 = memo(function CardOption4({ item, sourceName = 'Unknown', in
           <Button
             size="sm"
             onClick={() => toggleLike(-1)}
-            isLoading={loading}
+            loading={loading}
             bg="gray.700"
             color="white"
             flex={1}

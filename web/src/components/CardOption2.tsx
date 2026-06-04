@@ -1,5 +1,5 @@
 import { useState, memo } from 'react';
-import { Box, Flex, Text, Button, Badge, HStack, Icon } from '@chakra-ui/react';
+import { Box, Flex, Text, Button, Badge, Icon } from '@chakra-ui/react';
 import { getDb } from '@/lib/db';
 import { itemLikes } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
@@ -36,7 +36,7 @@ function getGradient(sourceType: string): string {
   }
 }
 
-const CardOption2 = memo(function CardOption2({ item, sourceName = 'Unknown', initialLiked = null, onLikeChange }: CardOption2Props) {
+const CardOption2 = memo(function CardOption2({ item, initialLiked = null, onLikeChange }: CardOption2Props) {
   const { userId } = useUser();
   const [liked, setLiked] = useState<number | null>(initialLiked);
   const [loading, setLoading] = useState(false);
@@ -116,7 +116,7 @@ const CardOption2 = memo(function CardOption2({ item, sourceName = 'Unknown', in
             <Icon as={SourceIconComponent} color="white" boxSize={4} />
           </Flex>
           <Box flex={1} minW={0}>
-            <Text fontSize="2xs" color="gray.500" noOfLines={1}>
+            <Text fontSize="2xs" color="gray.500" lineClamp={1}>
               {formatDate(item.publishedAt)}
             </Text>
           </Box>
@@ -128,7 +128,7 @@ const CardOption2 = memo(function CardOption2({ item, sourceName = 'Unknown', in
           lineHeight="1.2"
           color="white"
           mb={2}
-          noOfLines={2}
+          lineClamp={2}
           bgGradient={gradient}
           bgClip="text"
         >
@@ -136,7 +136,7 @@ const CardOption2 = memo(function CardOption2({ item, sourceName = 'Unknown', in
         </Text>
 
         {item.summary && (
-          <Text fontSize="xs" lineHeight="1.5" color="gray.400" mb={3} noOfLines={3}>
+          <Text fontSize="xs" lineHeight="1.5" color="gray.400" mb={3} lineClamp={3}>
             {excerpt(item.summary, 100)}
           </Text>
         )}
@@ -166,7 +166,7 @@ const CardOption2 = memo(function CardOption2({ item, sourceName = 'Unknown', in
           <Button
             size="xs"
             onClick={() => toggleLike(1)}
-            isLoading={loading}
+            loading={loading}
             flex={1}
             variant={liked === 1 ? 'solid' : 'outline'}
             colorScheme="green"
@@ -177,7 +177,7 @@ const CardOption2 = memo(function CardOption2({ item, sourceName = 'Unknown', in
           <Button
             size="xs"
             onClick={() => toggleLike(-1)}
-            isLoading={loading}
+            loading={loading}
             flex={1}
             variant={liked === -1 ? 'solid' : 'outline'}
             colorScheme="red"

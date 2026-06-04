@@ -1,7 +1,7 @@
 // web/src/lib/sources.ts
 import type { InferSelectModel } from 'drizzle-orm';
 import { desc, eq } from 'drizzle-orm';
-import { getDb, getPGlite } from './db';
+import { getDb } from './db';
 import { sources } from './schema';
 
 export type Source = InferSelectModel<typeof sources>;

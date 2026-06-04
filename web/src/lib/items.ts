@@ -116,7 +116,7 @@ export async function getItemsByTopics(topics: string[]): Promise<Item[]> {
       ORDER BY COALESCE(published_at, created_at) DESC
     `, [topics]);
     
-    return result.rows;
+    return result.rows as Item[];
   } catch (err) {
     logger.warn('Failed to get items by topics:', err);
     return [];
@@ -285,7 +285,7 @@ export async function getAllTopics(): Promise<string[]> {
       ORDER BY topic
     `);
     
-    return result.rows.map(r => r.topic);
+    return (result.rows as { topic: string }[]).map(r => r.topic);
   } catch (err) {
     logger.warn('Failed to get topics:', err);
     return [];

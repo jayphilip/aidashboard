@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 import { logger } from '@/utils/logger';
 
 const USER_ID_KEY = 'aidashboard_user_id';

@@ -10,8 +10,7 @@ export default function Navigation() {
     const isActive = location.pathname === to;
     return (
       <ChakraLink
-        as={Link}
-        to={to}
+        asChild
         px={4}
         py={2}
         rounded="lg"
@@ -33,8 +32,10 @@ export default function Navigation() {
         }}
         transition="all 0.2s"
       >
-        <Icon size={16} />
-        {children}
+        <Link to={to}>
+          <Icon size={16} />
+          {children}
+        </Link>
       </ChakraLink>
     );
   };
@@ -59,8 +60,7 @@ export default function Navigation() {
         >
           {/* Logo/Title */}
           <Heading
-            as={Link}
-            to="/"
+            asChild
             size="lg"
             bgGradient="linear(to-r, blue.400, cyan.400)"
             bgClip="text"
@@ -70,7 +70,7 @@ export default function Navigation() {
             fontWeight="black"
             letterSpacing="tight"
           >
-            🤖 AI Dashboard
+            <Link to="/">🤖 AI Dashboard</Link>
           </Heading>
 
           {/* Search bar */}
