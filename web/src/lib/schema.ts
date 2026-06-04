@@ -148,3 +148,25 @@ export const collectionItems = pgTable('collection_items', {
   itemId: uuid('item_id').notNull(),
   createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
 });
+
+// A single theme within a Hermes trend report
+export interface TrendTheme {
+  name: string;
+  summary: string;
+  item_count: number;
+  tags: string[];
+  items: { title: string; url: string }[];
+}
+
+// Trend reports - Hermes (OpenRouter) generated summaries of recent items.
+// Produced server-side by the Rust ingestor and synced via ElectricSQL.
+export const trendReports = pgTable('trend_reports', {
+  id: uuid('id').primaryKey().notNull(),
+  reportDate: text('report_date').notNull(),
+  itemsAnalyzed: integer('items_analyzed').notNull().default(0),
+  narrative: text('narrative').notNull().default(''),
+  themes: jsonb('themes').$type<TrendTheme[]>().default([] as any),
+  model: text('model'),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull(),
+});

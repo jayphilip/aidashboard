@@ -1,10 +1,10 @@
 // web/src/lib/db.ts
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
-import { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences, collections, collectionItems } from './schema';
+import { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences, collections, collectionItems, trendReports } from './schema';
 
 // Schema version - increment when schema changes to force client DB reset
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 // Singleton-style promises so we only initialise once per tab
 let pglitePromise: Promise<PGlite> | null = null;
@@ -129,6 +129,7 @@ export function getDb() {
           published_at TIMESTAMPTZ NOT NULL,
           raw_metadata JSONB DEFAULT '{}'::JSONB,
           topics TEXT[] DEFAULT '{}',
+          search_vector tsvector,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
@@ -184,6 +185,18 @@ export function getDb() {
           UNIQUE(collection_id, item_id)
         );
 
+        CREATE TABLE IF NOT EXISTS trend_reports (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          report_date TEXT NOT NULL,
+          items_analyzed INTEGER NOT NULL DEFAULT 0,
+          narrative TEXT NOT NULL DEFAULT '',
+          themes JSONB DEFAULT '[]'::JSONB,
+          model TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(report_date)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sources_active ON sources(active);
         CREATE INDEX IF NOT EXISTS idx_sources_type ON sources(type);
         CREATE INDEX IF NOT EXISTS idx_sources_medium ON sources(medium);
@@ -209,9 +222,11 @@ export function getDb() {
         CREATE INDEX IF NOT EXISTS idx_collection_items_collection_id ON collection_items(collection_id);
         CREATE INDEX IF NOT EXISTS idx_collection_items_item_id ON collection_items(item_id);
         CREATE INDEX IF NOT EXISTS idx_collection_items_collection_item ON collection_items(collection_id, item_id);
+
+        CREATE INDEX IF NOT EXISTS idx_trend_reports_report_date ON trend_reports(report_date DESC);
       `);
 
-      return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences, collections, collectionItems } });
+      return drizzle(pg, { schema: { papers, sources, items, itemTopics, itemLikes, itemReads, userPreferences, collections, collectionItems, trendReports } });
     })();
   }
   return dbPromise;

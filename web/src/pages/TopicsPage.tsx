@@ -4,6 +4,7 @@ import { TrendingUp, Flame, Sparkles, ArrowUp, ArrowDown } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
 import { rankItems } from '@/lib/scoring';
 import ItemCard from '@/components/ItemCard';
+import HermesSummary from '@/components/HermesSummary';
 
 interface TopicStats {
   topic: string;
@@ -13,7 +14,7 @@ interface TopicStats {
 }
 
 export default function TopicsPage() {
-  const { items: allItems, loading: syncLoading, sourcesMap, likesMap, readsMap, refreshLikes, refreshReads } = useItems();
+  const { items: allItems, loading: syncLoading, sourcesMap, likesMap, readsMap, refreshLikes, refreshReads, trendReport } = useItems();
   const [topicStats, setTopicStats] = useState<TopicStats[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
@@ -180,6 +181,9 @@ export default function TopicsPage() {
             Discover trending AI topics, popular research areas, and emerging themes
           </Text>
         </Box>
+
+        {/* Hermes summary (synced from the ingestor) */}
+        {trendReport && <HermesSummary report={trendReport} />}
 
         {/* Active Topic Filter */}
         {selectedTopic && (

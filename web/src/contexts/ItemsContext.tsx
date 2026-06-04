@@ -1,11 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { getPGlite, getDb } from '@/lib/db';
 import { getAllItems, type Item } from '@/lib/items';
 import { logger } from '@/utils/logger';
-import { ShapeStream } from '@electric-sql/client';
-import { sources, itemLikes, itemReads } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { ShapeStream, isChangeMessage } from '@electric-sql/client';
+import { sources, itemLikes, itemReads, trendReports, type TrendTheme } from '@/lib/schema';
+import { eq, desc } from 'drizzle-orm';
 import { useUser } from './UserContext';
+
+export interface TrendReport {
+  id: string;
+  reportDate: string;
+  itemsAnalyzed: number;
+  narrative: string;
+  themes: TrendTheme[];
+  model: string | null;
+}
 
 interface ItemsState {
   loading: boolean;
@@ -14,6 +23,7 @@ interface ItemsState {
   sourcesMap: Map<number, string>;
   likesMap: Map<string, number | null>;
   readsMap: Map<string, boolean>;
+  trendReport: TrendReport | null;
 }
 
 interface ItemsContextType extends ItemsState {
@@ -22,6 +32,7 @@ interface ItemsContextType extends ItemsState {
   refreshLikes: () => Promise<void>;
   refreshReads: () => Promise<void>;
   refreshSources: () => Promise<void>;
+  refreshTrendReport: () => Promise<void>;
   markAsRead: (itemId: string) => Promise<void>;
   markAsUnread: (itemId: string) => Promise<void>;
 }
@@ -41,6 +52,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     sourcesMap: new Map(),
     likesMap: new Map(),
     readsMap: new Map(),
+    trendReport: null,
   });
 
   const refreshItems = useCallback(async () => {
@@ -120,6 +132,31 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshTrendReport = useCallback(async () => {
+    try {
+      const db = await getDb();
+      const rows = await db
+        .select()
+        .from(trendReports)
+        .orderBy(desc(trendReports.reportDate))
+        .limit(1);
+      const row = rows[0];
+      const trendReport: TrendReport | null = row
+        ? {
+            id: row.id,
+            reportDate: row.reportDate,
+            itemsAnalyzed: row.itemsAnalyzed,
+            narrative: row.narrative,
+            themes: (row.themes ?? []) as TrendTheme[],
+            model: row.model,
+          }
+        : null;
+      setState(prev => ({ ...prev, trendReport }));
+    } catch (err) {
+      logger.warn('Failed to refresh trend report:', err);
+    }
+  }, []);
+
   const markAsRead = useCallback(async (itemId: string) => {
     try {
       const db = await getDb();
@@ -176,6 +213,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       console.log('[ItemsSync] Loading cached data for instant render...');
       await refreshItems();
       await loadAuxiliaryData();
+      await refreshTrendReport();
       setState(prev => ({ ...prev, loading: false })); // Show UI immediately!
 
       const electricUrl = import.meta.env.VITE_ELECTRIC_URL || 'http://localhost:3000';
@@ -323,10 +361,10 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             continue;
           }
           
-          if (message.value) {
+          if (isChangeMessage(message) && message.value) {
             itemCount++;
-            
-            const itemData = { ...message.value };
+
+            const itemData: any = { ...message.value };
             
             // Convert source_id from string to integer
             if (itemData.source_id) {
@@ -471,7 +509,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             continue;
           }
 
-          if (message.value) {
+          if (isChangeMessage(message) && message.value) {
             sourcesCount++;
             console.log('[ItemsSync] sources: Received source data:', message.value);
             sourcesBatch.push(message.value);
@@ -531,7 +569,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
             continue;
           }
 
-          if (message.value) {
+          if (isChangeMessage(message) && message.value) {
             likesCount++;
             likesBatch.push(message.value);
 
@@ -556,6 +594,55 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       }
       );
 
+      // Sync trend_reports (Hermes summaries). Non-blocking: this does NOT
+      // count toward totalShapes, so a slow/empty trend feed never gates the UI.
+      let trendBatch: any[] = [];
+
+      const trendUrl = `${baseUrl}?table=trend_reports`;
+      console.log('[ItemsSync] Subscribing to trend_reports stream:', trendUrl);
+
+      const trendStream = new ShapeStream({
+        url: trendUrl,
+      });
+
+      trendStream.subscribe(
+        async (messages) => {
+          for (const message of messages) {
+            if (message.headers?.control === 'up-to-date') {
+              if (trendBatch.length > 0) {
+                await flushBatch('trend_reports', trendBatch, pg);
+                trendBatch = [];
+              }
+              await refreshTrendReport();
+              continue;
+            }
+
+            if (isChangeMessage(message) && message.value) {
+              const row: any = { ...message.value };
+              // Coerce timestamps to Date for consistency with other tables.
+              if (typeof row.created_at === 'string') row.created_at = new Date(row.created_at);
+              if (typeof row.updated_at === 'string') row.updated_at = new Date(row.updated_at);
+              trendBatch.push(row);
+
+              if (trendBatch.length >= BATCH_SIZE) {
+                await flushBatch('trend_reports', trendBatch, pg);
+                trendBatch = [];
+              }
+            }
+          }
+
+          if (trendBatch.length > 0) {
+            await flushBatch('trend_reports', trendBatch, pg);
+            trendBatch = [];
+            await refreshTrendReport();
+          }
+        },
+        (error) => {
+          console.error('[ItemsSync] Trend reports stream error:', error);
+          // Non-fatal: the Trends tab simply falls back to client-side stats.
+        }
+      );
+
       console.log('[ItemsSync] All streams subscribed');
 
     } catch (err) {
@@ -566,14 +653,14 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
         error: (err as Error).message
       }));
     }
-  }, [refreshItems, loadAuxiliaryData]);
+  }, [refreshItems, loadAuxiliaryData, refreshTrendReport]);
 
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
 
   return (
-    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes, refreshReads, refreshSources, markAsRead, markAsUnread }}>
+    <ItemsContext.Provider value={{ ...state, refreshItems, waitForSync, refreshLikes, refreshReads, refreshSources, refreshTrendReport, markAsRead, markAsUnread }}>
       {children}
     </ItemsContext.Provider>
   );

@@ -3,6 +3,7 @@ mod db;
 mod models;
 mod sources;
 mod topics;
+mod trends;
 
 use anyhow::Result;
 use config::Config;
@@ -60,6 +61,12 @@ async fn main() -> Result<()> {
                 log::error!("Ingestion cycle failed: {}", e);
                 // Continue running even if one cycle fails
             }
+        }
+
+        // Generate a Hermes trend report from the freshest items. Failures here
+        // must not break the ingestion loop, so they're logged and swallowed.
+        if let Err(e) = trends::run_trend_analysis(&pool, &config).await {
+            log::error!("Trend analysis failed: {}", e);
         }
 
         let cycle_duration = cycle_start.elapsed();
