@@ -79,12 +79,23 @@ export default function Navigation() {
           </Box>
 
           {/* Navigation links */}
-          <Flex gap={2} flexShrink={0} order={{ base: 2, md: 3 }}>
-            <NavLink to="/today" icon={Newspaper}>Today</NavLink>
-            <NavLink to="/topics" icon={TrendingUp}>Trends</NavLink>
-            <NavLink to="/collections" icon={Bookmark}>Collections</NavLink>
-            <NavLink to="/sources" icon={Settings}>Sources</NavLink>
-          </Flex>
+          <Box
+            order={{ base: 2, md: 3 }}
+            overflowX={{ base: 'auto', md: 'visible' }}
+            sx={{
+              '&::-webkit-scrollbar': {
+                display: 'none',
+              },
+              scrollbarWidth: 'none',
+            }}
+          >
+            <Flex gap={2} flexShrink={0} minW={{ base: 'max-content', md: 'auto' }}>
+              <NavLink to="/today" icon={Newspaper}>Today</NavLink>
+              <NavLink to="/trends" icon={TrendingUp}>Trends</NavLink>
+              <NavLink to="/collections" icon={Bookmark}>Collections</NavLink>
+              <NavLink to="/sources" icon={Settings}>Sources</NavLink>
+            </Flex>
+          </Box>
         </Flex>
       </Container>
     </Box>

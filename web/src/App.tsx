@@ -17,7 +17,8 @@ function App() {
             <Route path="/" element={<Navigate to="/today" replace />} />
             <Route path="/today" element={<TodayPage />} />
             <Route path="/search" element={<SearchPage />} />
-            <Route path="/topics" element={<TopicsPage />} />
+            <Route path="/trends" element={<TopicsPage />} />
+            <Route path="/topics" element={<Navigate to="/trends" replace />} />
             <Route path="/sources" element={<SourcesPage />} />
             <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/card-preview" element={<CardPreviewPage />} />

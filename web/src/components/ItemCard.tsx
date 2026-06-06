@@ -1,5 +1,5 @@
 import { useState, memo } from 'react';
-import { Box, Flex, Text, Button, Badge, Icon } from '@chakra-ui/react';
+import { Box, Flex, Text, Button, Badge, Icon, IconButton } from '@chakra-ui/react';
 import { getDb } from '@/lib/db';
 import { itemLikes } from '@/lib/schema';
 import { eq, and } from 'drizzle-orm';
@@ -101,6 +101,8 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
       borderWidth="1px"
       borderColor="gray.700"
       rounded="lg"
+      minW={0}
+      w="full"
       overflow="hidden"
       transition="all 0.2s"
       _hover={{
@@ -173,6 +175,7 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
             {item.topics.slice(0, 3).map(topic => (
               <Badge
                 key={topic}
+                title={topic}
                 bg="gray.700"
                 color="gray.300"
                 fontSize="2xs"
@@ -181,6 +184,11 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
                 rounded="md"
                 borderWidth="1px"
                 borderColor="gray.600"
+                display="inline-block"
+                maxW="100%"
+                whiteSpace="nowrap"
+                overflow="hidden"
+                textOverflow="ellipsis"
               >
                 {topic}
               </Badge>
@@ -191,9 +199,10 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
 
       {/* Footer Actions */}
       <Box p={2.5} borderTopWidth="1px" borderColor="gray.700" bg="gray.850">
-        <Flex gap={2}>
-          <Button
+        <Flex gap={2} align="center">
+          <IconButton
             size="sm"
+            aria-label="Like item"
             onClick={(e) => {
               e.stopPropagation();
               toggleLike(1);
@@ -201,18 +210,17 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
             loading={loading}
             bg="gray.700"
             color="white"
-            flex={1}
-            fontSize="xs"
+            flexShrink={0}
             _hover={{
               bg: 'gray.600',
-              transform: 'scale(1.05)',
             }}
             opacity={liked === 1 ? 1 : 0.7}
           >
             <ThumbsUp size={16} fill={liked === 1 ? 'currentColor' : 'none'} />
-          </Button>
-          <Button
+          </IconButton>
+          <IconButton
             size="sm"
+            aria-label="Dislike item"
             onClick={(e) => {
               e.stopPropagation();
               toggleLike(-1);
@@ -220,47 +228,48 @@ const ItemCard = memo(function ItemCard({ item, sourceName = 'Unknown', initialL
             loading={loading}
             bg="gray.700"
             color="white"
-            flex={1}
-            fontSize="xs"
+            flexShrink={0}
             _hover={{
               bg: 'gray.600',
-              transform: 'scale(1.05)',
             }}
             opacity={liked === -1 ? 1 : 0.7}
           >
             <ThumbsDown size={16} fill={liked === -1 ? 'currentColor' : 'none'} />
-          </Button>
-          <Button
+          </IconButton>
+          <IconButton
             size="sm"
+            aria-label="Save to collection"
             onClick={(e) => {
               e.stopPropagation();
               setSaveModalOpen(true);
             }}
             bg="gray.700"
             color="white"
-            flex={1}
-            fontSize="xs"
+            flexShrink={0}
             _hover={{
               bg: 'gray.600',
-              transform: 'scale(1.05)',
             }}
-            aria-label="Save to collection"
           >
             <Bookmark size={16} />
-          </Button>
+          </IconButton>
           <Button
             size="sm"
             onClick={handleExternalLinkClick}
             bgGradient={gradient}
             color="white"
             flex={1}
+            minW={0}
             fontSize="xs"
             _hover={{
-              transform: 'scale(1.05)',
               opacity: 0.9,
             }}
           >
-            <ExternalLink size={16} />
+            <Flex align="center" justify="center" gap={1.5}>
+              <ExternalLink size={14} />
+              <Text as="span" fontSize="xs" fontWeight="semibold">
+                Open
+              </Text>
+            </Flex>
           </Button>
         </Flex>
       </Box>

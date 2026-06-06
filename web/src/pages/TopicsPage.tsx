@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Container, Flex, Text, Heading, Badge, Grid, Spinner } from '@chakra-ui/react';
+import { Box, Container, Flex, Text, Heading, Badge, Grid, Skeleton, SkeletonText } from '@chakra-ui/react';
 import { TrendingUp, Flame, Sparkles, ArrowUp, ArrowDown } from 'lucide-react';
 import { useItems } from '@/contexts/ItemsContext';
 import { rankItems } from '@/lib/scoring';
@@ -115,14 +115,52 @@ export default function TopicsPage() {
 
   if (syncLoading) {
     return (
-      <Container maxW="7xl" py={12}>
-        <Flex justify="center" align="center" minH="400px">
-          <Flex direction="column" align="center" gap={4}>
-            <Spinner size="xl" color="green.400" borderWidth="3px" />
-            <Text color="gray.400">Loading trends data...</Text>
-          </Flex>
-        </Flex>
-      </Container>
+      <Box minH="100vh" bg="gray.950" color="white">
+        <Container maxW="7xl" py={8}>
+          <Box mb={8}>
+            <Skeleton height="34px" width="280px" mb={3} rounded="md" />
+            <Skeleton height="18px" width="420px" maxW="100%" rounded="md" />
+          </Box>
+
+          <Box mb={8}>
+            <Flex align="center" gap={2} mb={4}>
+              <Skeleton boxSize="20px" rounded="md" />
+              <Skeleton height="28px" width="190px" rounded="md" />
+            </Flex>
+            <Grid templateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap={3}>
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <Box key={`topic-skeleton-${idx}`} bg="gray.800" borderWidth="1px" borderColor="gray.700" rounded="lg" p={4}>
+                  <Skeleton height="16px" width="75%" mb={3} rounded="sm" />
+                  <Skeleton height="12px" width="45%" rounded="sm" />
+                </Box>
+              ))}
+            </Grid>
+          </Box>
+
+          <Box>
+            <Flex align="center" gap={2} mb={4}>
+              <Skeleton height="28px" width="180px" rounded="md" />
+              <Skeleton height="20px" width="32px" rounded="md" />
+            </Flex>
+            <Grid templateColumns="repeat(auto-fit, minmax(300px, 1fr))" gap={6}>
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <Box key={`item-skeleton-${idx}`} bg="gray.800" borderWidth="1px" borderColor="gray.700" rounded="lg" p={4}>
+                  <Skeleton height="14px" width="42%" mb={3} rounded="sm" />
+                  <Skeleton height="18px" width="88%" mb={2} rounded="sm" />
+                  <Skeleton height="18px" width="70%" mb={3} rounded="sm" />
+                  <SkeletonText noOfLines={3} gap="2" mb={4} />
+                  <Flex gap={2}>
+                    <Skeleton height="34px" flex={1} rounded="md" />
+                    <Skeleton height="34px" flex={1} rounded="md" />
+                    <Skeleton height="34px" flex={1} rounded="md" />
+                    <Skeleton height="34px" flex={2} rounded="md" />
+                  </Flex>
+                </Box>
+              ))}
+            </Grid>
+          </Box>
+        </Container>
+      </Box>
     );
   }
 
@@ -230,12 +268,13 @@ export default function TopicsPage() {
               Most Mentioned
             </Badge>
           </Flex>
-          <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }} gap={3}>
+          <Grid templateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap={3}>
             {trendingTopics.map((stat) => (
               <Box
                 key={stat.topic}
                 as="button"
                 onClick={() => setSelectedTopic(stat.topic)}
+                minW={0}
                 bg={selectedTopic === stat.topic ? 'blue.900' : 'gray.800'}
                 borderWidth="1px"
                 borderColor={selectedTopic === stat.topic ? 'blue.700' : 'gray.700'}
@@ -295,12 +334,13 @@ export default function TopicsPage() {
                 Fastest Growing
               </Badge>
             </Flex>
-            <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }} gap={3}>
+            <Grid templateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap={3}>
               {risingTopics.map((stat) => (
                 <Box
                   key={stat.topic}
                   as="button"
                   onClick={() => setSelectedTopic(stat.topic)}
+                  minW={0}
                   bg={selectedTopic === stat.topic ? 'purple.900' : 'gray.800'}
                   borderWidth="1px"
                   borderColor={selectedTopic === stat.topic ? 'purple.700' : 'gray.700'}
@@ -349,12 +389,13 @@ export default function TopicsPage() {
                 High Engagement
               </Badge>
             </Flex>
-            <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }} gap={3}>
+            <Grid templateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap={3}>
               {hotTopics.map((stat) => (
                 <Box
                   key={stat.topic}
                   as="button"
                   onClick={() => setSelectedTopic(stat.topic)}
+                  minW={0}
                   bg={selectedTopic === stat.topic ? 'orange.900' : 'gray.800'}
                   borderWidth="1px"
                   borderColor={selectedTopic === stat.topic ? 'orange.700' : 'gray.700'}
@@ -399,7 +440,7 @@ export default function TopicsPage() {
             </Badge>
           </Flex>
           <Grid
-            templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
+            templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
             gap={6}
           >
             {topItems.map((item) => (
