@@ -5,6 +5,7 @@ import { Newspaper, Mail, FileText, Twitter, AlertCircle, ArrowRight } from 'luc
 import { useItems } from '@/contexts/ItemsContext';
 import ItemCard from '@/components/ItemCard';
 import ItemDetailModal from '@/components/ItemDetailModal';
+import { parseItemDate } from '@/utils/formatting';
 import type { Item } from '@/lib/items';
 
 interface ContentSection {
@@ -57,26 +58,14 @@ export default function TodayPage() {
       matchingType: allItems.filter(i => i.sourceType === type).length,
     });
 
-    // Sample the first item of this type for debugging
-    const sampleItem = allItems.find(i => i.sourceType === type);
-    if (sampleItem) {
-      const sampleDateRaw = sampleItem.publishedAt || sampleItem.createdAt;
-      const sampleDate = typeof sampleDateRaw === 'string' ? new Date(sampleDateRaw) : sampleDateRaw;
-      console.log(`[TodayPage] Sample ${type} item:`, {
-        title: sampleItem.title.substring(0, 50),
-        dateRaw: sampleDateRaw,
-        dateType: typeof sampleDateRaw,
-        dateParsed: sampleDate.toISOString(),
-        isRecent: sampleDate >= thirtyDaysAgo,
-      });
-    }
-
     const filtered = allItems.filter(item => {
       const itemDateRaw = item.publishedAt || item.createdAt;
-      // Ensure date is a Date object for comparison
-      const itemDate = typeof itemDateRaw === 'string' ? new Date(itemDateRaw) : itemDateRaw;
+      // Ensure date is a Date object for comparison. iOS Safari's Date parser
+      // is stricter than Chrome's and returns Invalid Date for some Postgres
+      // timestamp formats, so guard against NaN rather than letting it crash.
+      const itemDate = parseItemDate(itemDateRaw);
       const matchesType = item.sourceType === type;
-      const isRecent = itemDate >= thirtyDaysAgo;
+      const isRecent = itemDate !== null && itemDate >= thirtyDaysAgo;
 
       return matchesType && isRecent;
     }).slice(0, 6);
