@@ -60,7 +60,7 @@ export default function HermesSummary({ report }: HermesSummaryProps) {
       {/* Themes */}
       {report.themes.length > 0 && (
         <Grid
-          templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(3, 1fr)' }}
+          templateColumns={{ base: 'minmax(0, 1fr)', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' }}
           gap={4}
         >
           {report.themes.map((theme, i) => (
@@ -71,11 +71,12 @@ export default function HermesSummary({ report }: HermesSummaryProps) {
               borderColor="gray.700"
               rounded="lg"
               p={4}
+              minW={0}
               transition="all 0.2s"
               _hover={{ borderColor: 'teal.600', transform: 'translateY(-2px)', shadow: 'lg' }}
             >
-              <Flex justify="space-between" align="start" gap={2} mb={2}>
-                <Heading size="sm" color="white" lineHeight="short">
+              <Flex justify="space-between" align="start" gap={2} mb={2} minW={0}>
+                <Heading size="sm" color="white" lineHeight="short" flex={1} minW={0} wordBreak="break-word">
                   {theme.name}
                 </Heading>
                 <Badge colorScheme="teal" fontSize="2xs" flexShrink={0}>
@@ -84,7 +85,7 @@ export default function HermesSummary({ report }: HermesSummaryProps) {
               </Flex>
 
               {theme.summary && (
-                <Text color="gray.400" fontSize="sm" mb={3} lineHeight="base">
+                <Text color="gray.400" fontSize="sm" mb={3} lineHeight="base" wordBreak="break-word">
                   {theme.summary}
                 </Text>
               )}
@@ -94,12 +95,17 @@ export default function HermesSummary({ report }: HermesSummaryProps) {
                   {theme.tags.map(tag => (
                     <Box
                       key={tag}
+                      title={tag}
                       fontSize="2xs"
                       bg="gray.700"
                       color="gray.300"
                       px={2}
                       py={0.5}
                       rounded="full"
+                      maxW="100%"
+                      overflow="hidden"
+                      textOverflow="ellipsis"
+                      whiteSpace="nowrap"
                     >
                       {tag}
                     </Box>
@@ -121,9 +127,10 @@ export default function HermesSummary({ report }: HermesSummaryProps) {
                       display="flex"
                       alignItems="center"
                       gap={1}
+                      minW={0}
                     >
                       <ExternalLink size={11} style={{ flexShrink: 0 }} />
-                      <Text as="span" css={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Text as="span" flex={1} minW={0} css={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {item.title}
                       </Text>
                     </ChakraLink>

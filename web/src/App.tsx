@@ -11,7 +11,7 @@ import CollectionsPage from './pages/CollectionsPage';
 function App() {
   return (
     <BrowserRouter>
-      <Box minH="100vh" bg="gray.900" color="white">
+      <Box minH="100vh" bg="gray.900" color="white" overflowX="clip">
         <Layout>
           <Routes>
             <Route path="/" element={<Navigate to="/today" replace />} />
