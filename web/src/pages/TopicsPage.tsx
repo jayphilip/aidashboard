@@ -14,7 +14,7 @@ interface TopicStats {
 }
 
 export default function TopicsPage() {
-  const { items: allItems, loading: syncLoading, sourcesMap, likesMap, readsMap, refreshLikes, refreshReads, trendReport } = useItems();
+  const { items: allItems, loading: syncLoading, sourcesMap, likesMap, readsMap, refreshLikes, refreshReads, trendReports } = useItems();
   const [topicStats, setTopicStats] = useState<TopicStats[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
 
@@ -221,7 +221,7 @@ export default function TopicsPage() {
         </Box>
 
         {/* Hermes summary (synced from the ingestor) */}
-        {trendReport && <HermesSummary report={trendReport} />}
+        {trendReports.length > 0 && <HermesSummary reports={trendReports} />}
 
         {/* Active Topic Filter */}
         {selectedTopic && (

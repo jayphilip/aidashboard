@@ -24,6 +24,7 @@ interface ItemsState {
   likesMap: Map<string, number | null>;
   readsMap: Map<string, boolean>;
   trendReport: TrendReport | null;
+  trendReports: TrendReport[];
 }
 
 interface ItemsContextType extends ItemsState {
@@ -53,6 +54,7 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
     likesMap: new Map(),
     readsMap: new Map(),
     trendReport: null,
+    trendReports: [],
   });
 
   const refreshItems = useCallback(async () => {
@@ -138,20 +140,16 @@ export function ItemsProvider({ children }: { children: ReactNode }) {
       const rows = await db
         .select()
         .from(trendReports)
-        .orderBy(desc(trendReports.reportDate))
-        .limit(1);
-      const row = rows[0];
-      const trendReport: TrendReport | null = row
-        ? {
-            id: row.id,
-            reportDate: row.reportDate,
-            itemsAnalyzed: row.itemsAnalyzed,
-            narrative: row.narrative,
-            themes: (row.themes ?? []) as TrendTheme[],
-            model: row.model,
-          }
-        : null;
-      setState(prev => ({ ...prev, trendReport }));
+        .orderBy(desc(trendReports.reportDate));
+      const reports: TrendReport[] = rows.map(row => ({
+        id: row.id,
+        reportDate: row.reportDate,
+        itemsAnalyzed: row.itemsAnalyzed,
+        narrative: row.narrative,
+        themes: (row.themes ?? []) as TrendTheme[],
+        model: row.model,
+      }));
+      setState(prev => ({ ...prev, trendReport: reports[0] ?? null, trendReports: reports }));
     } catch (err) {
       logger.warn('Failed to refresh trend report:', err);
     }

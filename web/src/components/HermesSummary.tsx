@@ -1,17 +1,37 @@
-import { Box, Flex, Text, Heading, Badge, Grid, Link as ChakraLink } from '@chakra-ui/react';
+import { useState } from 'react';
+import { Box, Flex, Text, Heading, Badge, Grid, Link as ChakraLink, NativeSelect } from '@chakra-ui/react';
 import { Sparkles, ExternalLink } from 'lucide-react';
 import type { TrendReport } from '@/contexts/ItemsContext';
 
 interface HermesSummaryProps {
-  report: TrendReport;
+  /** All synced reports, newest first. */
+  reports: TrendReport[];
+}
+
+/** Formats an ISO report date (e.g. "2026-06-13") as "Jun 13, 2026". */
+function formatReportDate(reportDate: string): string {
+  const parsed = new Date(`${reportDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return reportDate;
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 /**
  * Renders the Hermes (OpenRouter) generated "state of AI" summary that the
  * Rust ingestor produced and ElectricSQL synced into the local DB. Shown at
- * the top of the Trends tab.
+ * the top of the Trends tab. Defaults to the latest report; a date selector
+ * lets the user view past reports.
  */
-export default function HermesSummary({ report }: HermesSummaryProps) {
+export default function HermesSummary({ reports }: HermesSummaryProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  if (reports.length === 0) return null;
+
+  const report = reports.find(r => r.id === selectedId) ?? reports[0];
+
   const narrativeParagraphs = report.narrative
     .split('\n')
     .map(p => p.trim())
@@ -28,9 +48,31 @@ export default function HermesSummary({ report }: HermesSummaryProps) {
         <Badge colorScheme="teal" ml={1}>
           Hermes summary
         </Badge>
-        <Text color="gray.500" fontSize="xs" ml="auto">
-          {report.reportDate} · {report.itemsAnalyzed} items analyzed
-        </Text>
+
+        <Flex align="center" gap={3} ml="auto" wrap="wrap">
+          <Text color="gray.500" fontSize="xs">
+            {formatReportDate(report.reportDate)} · {report.itemsAnalyzed} items analyzed
+          </Text>
+          {reports.length > 1 && (
+            <NativeSelect.Root size="sm" width="auto" maxW="200px">
+              <NativeSelect.Field
+                aria-label="View a past AI summary"
+                value={report.id}
+                onChange={(e) => setSelectedId(e.target.value)}
+                bg="gray.800"
+                color="gray.200"
+                borderColor="gray.700"
+              >
+                {reports.map((r, i) => (
+                  <option key={r.id} value={r.id}>
+                    {formatReportDate(r.reportDate)}{i === 0 ? ' (latest)' : ''}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          )}
+        </Flex>
       </Flex>
 
       {/* Narrative */}
