@@ -37,7 +37,7 @@ impl Config {
             .filter(|k| !k.trim().is_empty());
 
         let openrouter_model = std::env::var("OPENROUTER_MODEL")
-            .unwrap_or_else(|_| "openrouter/owl-alpha".to_string());
+            .unwrap_or_else(|_| "nvidia/nemotron-3-ultra-550b-a55b:free".to_string());
 
         let trend_max_items = std::env::var("TREND_MAX_ITEMS")
             .ok()

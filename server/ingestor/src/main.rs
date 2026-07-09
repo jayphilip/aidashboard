@@ -66,8 +66,14 @@ async fn main() -> Result<()> {
         // Generate a Hermes trend report from the freshest items. Failures here
         // must not break the ingestion loop, so they're logged and swallowed.
         if let Err(e) = trends::run_trend_analysis(&pool, &config).await {
-            log::error!("Trend analysis failed: {}", e);
+            log::error!("[trends] Trend analysis failed this cycle: {}", e);
         }
+
+        // Independently of the attempt above, surface a loud warning if reports
+        // have gone stale. This is what makes a silently-failing trend step
+        // (e.g. a retired model) visible instead of hiding for days: even when
+        // run_trend_analysis errors are swallowed, this still fires each cycle.
+        trends::warn_if_reports_stale(&pool).await;
 
         let cycle_duration = cycle_start.elapsed();
         log::info!("Cycle took {:.2}s", cycle_duration.as_secs_f64());

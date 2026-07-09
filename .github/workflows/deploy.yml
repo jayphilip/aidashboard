@@ -69,8 +69,10 @@ jobs:
             echo "⏳ Waiting for services to start..."
             sleep 10
 
-            # Check if all critical containers are running
-            if docker compose -f docker-compose.prod.yml ps | grep -E "(postgres|electric|web)" | grep -v "Up" > /dev/null; then
+            # Check if all critical containers are running. The ingestor is
+            # included: it exiting/crashing is how trend generation silently
+            # stopped before, and this health check previously ignored it.
+            if docker compose -f docker-compose.prod.yml ps | grep -E "(postgres|electric|web|ingestor)" | grep -v "Up" > /dev/null; then
               echo "❌ Deployment failed - some services not running"
               docker compose -f docker-compose.prod.yml ps
               docker compose -f docker-compose.prod.yml logs --tail=50

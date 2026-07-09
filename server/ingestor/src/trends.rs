@@ -1,8 +1,8 @@
 //! LLM-powered trend analysis.
 //!
 //! After an ingestion cycle, this module feeds the most recent items to an
-//! OpenRouter model (default `openrouter/owl-alpha`, a free model; the call
-//! uses the OpenAI-compatible chat completions API) and asks for a structured
+//! OpenRouter model (default `nvidia/nemotron-3-ultra-550b-a55b:free`, a free
+//! model; the call uses the OpenAI-compatible chat completions API) and asks for a structured
 //! "state of AI" summary: an overall narrative plus a handful of named themes.
 //! The result is written to the `trend_reports` table, which syncs to the
 //! browser via ElectricSQL and populates the Trends tab — keeping the app's
@@ -203,10 +203,55 @@ async fn analyze(api_key: &str, model: &str, items: &[ItemForModel]) -> Result<T
         .and_then(|c| c.as_str())
         .ok_or_else(|| anyhow!("Unexpected OpenRouter response shape: {}", text))?;
 
-    let analysis: TrendAnalysis = serde_json::from_str(content)
+    // Some models (esp. reasoning models) ignore response_format and emit
+    // chain-of-thought prose around the JSON, or wrap it in ```json fences.
+    // Extract the outermost JSON object before parsing.
+    let json_slice = extract_json_object(content)
+        .ok_or_else(|| anyhow!("No JSON object found in Hermes response: {}", content))?;
+
+    let analysis: TrendAnalysis = serde_json::from_str(json_slice)
         .map_err(|e| anyhow!("Hermes returned non-conforming JSON: {} — content: {}", e, content))?;
 
     Ok(analysis)
+}
+
+/// Extract the outermost JSON object from a model response that may include
+/// reasoning prose and/or markdown fences around it. Returns the slice from the
+/// first `{` to the matching final `}` (tracking brace depth, ignoring braces
+/// inside strings). Returns None if no balanced object is present.
+fn extract_json_object(content: &str) -> Option<&str> {
+    let bytes = content.as_bytes();
+    let start = content.find('{')?;
+
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    for i in start..bytes.len() {
+        let c = bytes[i];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == b'\\' {
+                escaped = true;
+            } else if c == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match c {
+            b'"' => in_string = true,
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(&content[start..=i]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Cheap existence check so we don't pay for an LLM call when today's report
@@ -219,6 +264,55 @@ async fn report_exists(pool: &PgPool, report_date: &str) -> Result<bool> {
     .fetch_one(pool)
     .await?;
     Ok(exists)
+}
+
+/// How many days stale the newest report may be before we warn. One missed day
+/// can happen legitimately (a late cycle around midnight); two consecutive
+/// missed days means generation is actually broken and needs attention.
+const STALE_REPORT_THRESHOLD_DAYS: i64 = 2;
+
+/// Emit a loud, greppable warning when the newest trend report is stale, so a
+/// silently-failing generation step (retired model, bad key, non-conforming
+/// JSON) is visible in logs/monitoring instead of going unnoticed for days.
+///
+/// This is intentionally decoupled from the generation call: even when every
+/// `analyze()` attempt fails and its error is swallowed to keep ingestion
+/// alive, this check still fires each cycle. Non-fatal: any query error is
+/// logged and otherwise ignored — a monitoring aid must never break ingestion.
+pub async fn warn_if_reports_stale(pool: &PgPool) {
+    let latest: Option<chrono::NaiveDate> =
+        match sqlx::query_scalar("SELECT MAX(report_date) FROM trend_reports")
+            .fetch_one(pool)
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("[trends] Could not check report freshness: {}", e);
+                return;
+            }
+        };
+
+    let today = Utc::now().date_naive();
+    match latest {
+        None => {
+            log::warn!(
+                "[trends][STALE] No trend reports exist yet — generation has never succeeded"
+            );
+        }
+        Some(date) => {
+            let age_days = (today - date).num_days();
+            if age_days >= STALE_REPORT_THRESHOLD_DAYS {
+                log::warn!(
+                    "[trends][STALE] Newest trend report is {} ({} days old) — \
+                     generation appears to be failing; check logs above for the \
+                     underlying error (retired model / bad OPENROUTER_API_KEY / \
+                     non-conforming JSON)",
+                    date,
+                    age_days
+                );
+            }
+        }
+    }
 }
 
 /// Insert or update the canonical report for a given date.
@@ -246,4 +340,45 @@ async fn upsert_trend_report(
     .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_json_object;
+
+    #[test]
+    fn extracts_plain_object() {
+        assert_eq!(extract_json_object(r#"{"a":1}"#), Some(r#"{"a":1}"#));
+    }
+
+    #[test]
+    fn extracts_object_after_reasoning_prose() {
+        let s = "The user wants JSON. Let me think...\nHere it is:\n{\"narrative\":\"x\",\"themes\":[]}";
+        assert_eq!(
+            extract_json_object(s),
+            Some("{\"narrative\":\"x\",\"themes\":[]}")
+        );
+    }
+
+    #[test]
+    fn extracts_from_markdown_fence() {
+        let s = "```json\n{\"a\":{\"b\":2}}\n```";
+        assert_eq!(extract_json_object(s), Some("{\"a\":{\"b\":2}}"));
+    }
+
+    #[test]
+    fn ignores_braces_inside_strings() {
+        let s = r#"prefix {"text":"a } b { c"} suffix"#;
+        assert_eq!(extract_json_object(s), Some(r#"{"text":"a } b { c"}"#));
+    }
+
+    #[test]
+    fn none_when_no_object() {
+        assert_eq!(extract_json_object("no json here"), None);
+    }
+
+    #[test]
+    fn none_when_unbalanced() {
+        assert_eq!(extract_json_object("{\"a\":1"), None);
+    }
 }
