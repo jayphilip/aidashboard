@@ -166,7 +166,13 @@ async fn analyze(api_key: &str, model: &str, items: &[ItemForModel]) -> Result<T
             { "role": "user", "content": user_content }
         ],
         "temperature": 0.3,
-        "max_tokens": 4096,
+        // Reasoning models spend tokens "thinking" before answering. Ask
+        // OpenRouter to run reasoning internally but exclude it from the
+        // response so `content` is just the JSON. `exclude` works even when a
+        // model's reasoning is mandatory (unlike effort: "none"). A generous
+        // token budget prevents the JSON from being truncated mid-object.
+        "reasoning": { "exclude": true },
+        "max_tokens": 16384,
         "response_format": { "type": "json_object" }
     });
 
@@ -280,7 +286,10 @@ const STALE_REPORT_THRESHOLD_DAYS: i64 = 2;
 /// alive, this check still fires each cycle. Non-fatal: any query error is
 /// logged and otherwise ignored — a monitoring aid must never break ingestion.
 pub async fn warn_if_reports_stale(pool: &PgPool) {
-    let latest: Option<chrono::NaiveDate> =
+    // report_date is stored as TEXT ("%Y-%m-%d"), so MAX() returns TEXT and we
+    // parse it here. That format sorts lexically the same as chronologically,
+    // so MAX() reliably yields the newest report.
+    let latest: Option<String> =
         match sqlx::query_scalar("SELECT MAX(report_date) FROM trend_reports")
             .fetch_one(pool)
             .await
@@ -292,26 +301,34 @@ pub async fn warn_if_reports_stale(pool: &PgPool) {
             }
         };
 
-    let today = Utc::now().date_naive();
-    match latest {
+    let latest = match latest {
         None => {
             log::warn!(
                 "[trends][STALE] No trend reports exist yet — generation has never succeeded"
             );
+            return;
         }
-        Some(date) => {
-            let age_days = (today - date).num_days();
-            if age_days >= STALE_REPORT_THRESHOLD_DAYS {
-                log::warn!(
-                    "[trends][STALE] Newest trend report is {} ({} days old) — \
-                     generation appears to be failing; check logs above for the \
-                     underlying error (retired model / bad OPENROUTER_API_KEY / \
-                     non-conforming JSON)",
-                    date,
-                    age_days
-                );
-            }
+        Some(s) => s,
+    };
+
+    let date = match chrono::NaiveDate::parse_from_str(&latest, "%Y-%m-%d") {
+        Ok(d) => d,
+        Err(e) => {
+            log::warn!("[trends] Could not parse latest report_date '{}': {}", latest, e);
+            return;
         }
+    };
+
+    let age_days = (Utc::now().date_naive() - date).num_days();
+    if age_days >= STALE_REPORT_THRESHOLD_DAYS {
+        log::warn!(
+            "[trends][STALE] Newest trend report is {} ({} days old) — \
+             generation appears to be failing; check logs above for the \
+             underlying error (retired model / bad OPENROUTER_API_KEY / \
+             non-conforming JSON)",
+            date,
+            age_days
+        );
     }
 }
 
