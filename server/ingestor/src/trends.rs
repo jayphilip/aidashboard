@@ -1,8 +1,8 @@
 //! LLM-powered trend analysis.
 //!
 //! After an ingestion cycle, this module feeds the most recent items to an
-//! OpenRouter model (default `google/gemma-4-26b-a4b-it:free`, a free
-//! model; the call uses the OpenAI-compatible chat completions API) and asks for a structured
+//! OpenRouter model (default `deepseek/deepseek-v4-flash`, a cheap paid model
+//! ~$0.003/day; the call uses the OpenAI-compatible chat completions API) and asks for a structured
 //! "state of AI" summary: an overall narrative plus a handful of named themes.
 //! The result is written to the `trend_reports` table, which syncs to the
 //! browser via ElectricSQL and populates the Trends tab — keeping the app's
