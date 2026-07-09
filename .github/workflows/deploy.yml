@@ -29,6 +29,9 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           envs: OPENROUTER_API_KEY
+          # A cold ingestor rebuild compiles the full Rust dependency tree,
+          # which exceeds the action's default 10m command timeout. Allow 30m.
+          command_timeout: 30m
           script: |
             set -e  # Exit on error
 
