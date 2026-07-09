@@ -1,7 +1,7 @@
 //! LLM-powered trend analysis.
 //!
 //! After an ingestion cycle, this module feeds the most recent items to an
-//! OpenRouter model (default `nvidia/nemotron-3-ultra-550b-a55b:free`, a free
+//! OpenRouter model (default `google/gemma-4-26b-a4b-it:free`, a free
 //! model; the call uses the OpenAI-compatible chat completions API) and asks for a structured
 //! "state of AI" summary: an overall narrative plus a handful of named themes.
 //! The result is written to the `trend_reports` table, which syncs to the

@@ -61,7 +61,7 @@ services:
       # Trend analysis (sourced from the VPS .env). If unset, the trend step
       # safely skips and ingestion still runs. Free model by default.
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemma-4-26b-a4b-it:free}
       TREND_MAX_ITEMS: ${TREND_MAX_ITEMS:-80}
     depends_on:
       postgres:
