@@ -20,6 +20,8 @@ const OPENROUTER_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 
 const SYSTEM_PROMPT: &str = r#"You are an AI research trends analyst. You receive a list of recent items (papers, blog posts, newsletters) from an AI news dashboard. Each item has a title, source type, optional summary, and topics.
 
+Write ALL output in English. Every narrative, theme name, summary, and tag must be English prose, regardless of the language of the input items.
+
 Your job:
 1. Read all items and identify what is actually happening in AI right now based ONLY on these items. Do not invent items or links.
 2. Write a concise "state of AI" narrative: 2-3 short paragraphs summarizing the dominant themes, notable shifts, and what's emerging. Be specific and reference real developments visible in the items.
@@ -42,7 +44,7 @@ Output STRICT JSON matching this schema exactly, no extra fields, no markdown:
   ]
 }
 
-Use only the provided items. Keep titles and urls verbatim. Return valid JSON only."#;
+Use only the provided items. Keep titles and urls verbatim. Write all generated text in English. Return valid JSON only."#;
 
 /// A representative item link inside a theme.
 #[derive(Debug, Clone, Serialize, Deserialize)]
